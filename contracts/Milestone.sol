@@ -1,99 +1,140 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.3;
+pragma solidity ^0.8.20;
 
+// ----------------------
+// Imports
+// ----------------------
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
+// ----------------------
+// Contract
+// ----------------------
 contract Milestone is Ownable, ReentrancyGuard, Pausable {
     // ----------------------
-    // Custom Errors
+    // Errors
     // ----------------------
     error InvalidAmount();
-    error NotAuthorized();
     error AlreadyCompleted();
     error NoFundsToRefund();
+    error NotAuthorized();
 
     // ----------------------
     // Events
     // ----------------------
-    event MilestoneCreated(uint indexed id, string description, uint amount);
+    event MilestoneCreated(uint indexed id, uint amount);
     event MilestoneCompleted(uint indexed id);
     event Refunded(address indexed user, uint amount);
 
     // ----------------------
-    // Struct
+    // Structs
     // ----------------------
-    struct Step {
-        string description;
+    struct Task {
+        uint id;
         uint amount;
         bool completed;
+        address contributor;
     }
 
     // ----------------------
     // State Variables
     // ----------------------
-    mapping(uint => Step) public milestones;
-    mapping(address => uint) public deposits;
     uint public nextId;
+    mapping(uint => Task) public milestones;
+    uint public totalBalance;
 
     // ----------------------
     // Modifiers
     // ----------------------
-    modifier onlyPositive(uint _amount) {
+    modifier validAmount(uint _amount) {
         if (_amount == 0) revert InvalidAmount();
         _;
     }
 
+    modifier notCompleted(uint _id) {
+        if (milestones[_id].completed) revert AlreadyCompleted();
+        _;
+    }
+
     // ----------------------
-    // Functions
+    // Core Functions
     // ----------------------
 
+    // Create a new milestone
     function createMilestone(
-        string memory _description,
         uint _amount
-    ) external onlyOwner onlyPositive(_amount) {
-        milestones[nextId] = Step({
-            description: _description,
+    ) external payable whenNotPaused validAmount(_amount) {
+        if (msg.value != _amount) revert InvalidAmount();
+
+        milestones[nextId] = Task({
+            id: nextId,
             amount: _amount,
-            completed: false
+            completed: false,
+            contributor: msg.sender
         });
 
-        emit MilestoneCreated(nextId, _description, _amount);
+        totalBalance += msg.value;
+
+        emit MilestoneCreated(nextId, _amount);
         nextId++;
     }
 
-    function completeMilestone(uint _id) external onlyOwner {
-        Step storage step = milestones[_id];
-        if (step.completed) revert AlreadyCompleted();
-        step.completed = true;
-
+    // Mark a milestone as completed (only owner)
+    function completeMilestone(
+        uint _id
+    ) external onlyOwner notCompleted(_id) whenNotPaused {
+        milestones[_id].completed = true;
         emit MilestoneCompleted(_id);
     }
 
-    function deposit() external payable whenNotPaused nonReentrant {
-        if (msg.value == 0) revert InvalidAmount();
-        deposits[msg.sender] += msg.value;
-    }
+    // Refund ETH to contributor if milestone not completed
+    function refund(uint _id) external nonReentrant whenNotPaused {
+        Task storage task = milestones[_id];
 
-    function refund(uint _amount) external nonReentrant whenNotPaused {
-        uint balance = deposits[msg.sender];
-        if (balance < _amount || balance == 0) revert NoFundsToRefund();
+        if (task.contributor != msg.sender) revert NotAuthorized();
+        if (task.completed) revert AlreadyCompleted();
+        if (task.amount == 0) revert NoFundsToRefund();
 
-        deposits[msg.sender] -= _amount;
+        uint _amount = task.amount;
+        task.amount = 0;
+
+        totalBalance -= _amount;
         payable(msg.sender).transfer(_amount);
 
         emit Refunded(msg.sender, _amount);
     }
 
     // ----------------------
-    // Emergency pause
+    // Owner Functions
     // ----------------------
+
+    // Withdraw all funds (only owner)
+    function withdrawAll() external onlyOwner nonReentrant {
+        uint balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+        totalBalance = 0;
+        payable(owner()).transfer(balance);
+    }
+
+    // Pause / Unpause (emergency control)
     function pause() external onlyOwner {
         _pause();
     }
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    // ----------------------
+    // View Functions
+    // ----------------------
+
+    function getMilestone(uint _id) external view returns (Task memory) {
+        return milestones[_id];
+    }
+
+    function getContractBalance() external view returns (uint) {
+        return address(this).balance;
     }
 }
