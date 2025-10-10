@@ -9,14 +9,17 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 // ----------------------
 // Contract
 // ----------------------
+
+///@notice This contract lets users create fundraising campaigns, donate Ether, 
+/// mark campaigns as completed, and withdraw collected funds
 contract Fundraiser is Ownable, ReentrancyGuard, Pausable {
     struct Campaign {
-        uint id;
-        string description;
-        uint goal;
-        uint raised;
-        bool completed;
-        address payable owner;
+        uint id;                     // Unique campaign ID
+        string description;          // Description of the campaign
+        uint goal;                   // Target amount in wei
+        uint raised;                 // Amount raised so far
+        bool completed;              // Whether the campaign is completed
+        address payable owner;       // Campaign owner (who created it
     }
     // ----------------------
     // State variables
@@ -33,6 +36,9 @@ contract Fundraiser is Ownable, ReentrancyGuard, Pausable {
     error InvalidCampaignId();
     error InvalidDonationAmount();
     error AlreadyCompleted();
+    error NotAuthorized();
+    error GoalNotReached();
+    error NoFundsToWithdraw();
 
     // ----------------------
     // Events
@@ -40,10 +46,18 @@ contract Fundraiser is Ownable, ReentrancyGuard, Pausable {
 
     event CampaignCreated(uint indexed id, address indexed owner, uint goal);
     event DonationReceived(uint indexed id, address indexed from, uint amount);
+    event CampaignCompleted(uint indexed id);
+    event FundsWithdrawn(uint indexed id, address indexed owner, uint amount);
 
     // ----------------------
     // Functions
     // ----------------------
+
+    /// @notice Create a new fundraising campaign
+    /// @dev The campaign starts active and can receive donations until completed
+    /// @param _description Short description of the campaign
+    /// @param _goal Target amount in wei
+
 
     function createCampaign(
         string memory _description,
@@ -71,4 +85,28 @@ contract Fundraiser is Ownable, ReentrancyGuard, Pausable {
 
         emit DonationReceived(_id, msg.sender, msg.value);
     }
+    function completeCampaign(uint _id) public whenNotPaused {
+        if(_id >= nextId) revert InvalidCampaignId();
+        if(msg.sender != campaigns[_id].owner) revert NotAuthorized();
+        if(campaigns[_id].raised < campaigns[_id].goal)revert GoalNotReached();
+        campaigns[_id].completed = true;
+        emit CampaignCompleted(_id);
+    }
+    function withdraw(uint _id) external nonReentrant  whenNotPaused {
+        if(_id >= nextId) revert InvalidCampaignId();
+        Campaign storage campaign = campaigns[_id];
+        if(!campaign.completed) revert GoalNotReached();
+        if(msg.sender != campaigns[_id].owner) revert NotAuthorized();
+        if(campaign.raised == 0) revert NoFundsToWithdraw();
+        uint amount = campaign.raised;
+        campaign.raised = 0;
+        campaign.owner.transfer(amount);
+        emit FundsWithdrawn(_id, campaign.owner, amount);
+    }
+    function pause() external onlyOwner {
+        _pause();
+    }
+    function unpause() external onltOwner [
+        _unpause();
+    ]
 }
