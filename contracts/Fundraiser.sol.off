@@ -19,7 +19,7 @@ contract Fundraiser is Ownable, ReentrancyGuard, Pausable {
         uint goal;                   // Target amount in wei
         uint raised;                 // Amount raised so far
         bool completed;              // Whether the campaign is completed
-        address payable owner;       // Campaign owner (who created it
+        address payable owner;       // Campaign owner who created it
     }
     // ----------------------
     // State variables
