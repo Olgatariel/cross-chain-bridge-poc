@@ -28,4 +28,9 @@ contracts/**/*.off
 #old contracts
 /contracts/_archive
 /test/_archiveTests
+# old tests only
+/test/_archiveTests
+!test/
 /UI
+/igniton
+.gitignore
