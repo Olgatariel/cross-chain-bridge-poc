@@ -98,7 +98,6 @@ contract Treasury is ReentrancyGuard, Ownable, Pausable {
     /// @dev Fallback function for invalid or incorrect data payloads
     fallback() external payable {
         if (msg.value > maxETHperTx) revert ExceedMaxETHlimits();
-        depositedBy[msg.sender].eth += msg.value;
         emit UnknownDataReceived(msg.sender, msg.value);
     }
 
@@ -127,7 +126,6 @@ contract Treasury is ReentrancyGuard, Ownable, Pausable {
         if (amount == 0) revert InvalidAmount();
         if (amount > maxTARperTx) revert ExceedMaxTARlimits();
         token.safeTransferFrom(msg.sender, address(this), amount);
-        depositedBy[msg.sender].tokens += amount;
         emit TokensDeposited(msg.sender, amount);
     }
 
