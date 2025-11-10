@@ -14,10 +14,10 @@ async function main() {
   });
 
   await tx.wait();
-  console.log("✅ Sent 0.5 ETH to contract:", contractAddress);
+  console.log("Sent 0.5 ETH to contract:", contractAddress);
 
   const balance = await ethers.provider.getBalance(contractAddress);
-  console.log("💰 Contract balance:", ethers.formatEther(balance), "ETH");
+  console.log("Contract balance:", ethers.formatEther(balance), "ETH");
 }
 
 main().catch((error) => {

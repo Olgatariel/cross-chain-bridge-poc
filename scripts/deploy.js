@@ -9,14 +9,13 @@ async function main() {
   const token = await Token.deploy("Tar Token", "TAR"); 
   await token.waitForDeployment();
   const tokenAddress = await token.getAddress();
-  console.log("✅ Token deployed at:", tokenAddress);
+  console.log("Token deployed at:", tokenAddress);
 
-  // 2️⃣ Deploy Treasury
   const Treasury = await ethers.getContractFactory("contracts/DeFiEcoSystem/Treasury.sol:Treasury");
   const treasury = await Treasury.deploy(tokenAddress);
   await treasury.waitForDeployment();
   const treasuryAddress = await treasury.getAddress();
-  console.log("✅ Treasury deployed at:", treasuryAddress);
+  console.log("Treasury deployed at:", treasuryAddress);
 }
 
 main().catch((error) => {
