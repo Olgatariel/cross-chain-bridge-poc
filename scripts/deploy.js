@@ -4,7 +4,7 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying with:", deployer.address);
 
-  // 1️⃣ Deploy token - ПЕРЕДАЄМО name і symbol
+
   const Token = await ethers.getContractFactory("contracts/DeFiEcoSystem/Token.sol:TarToken");
   const token = await Token.deploy("Tar Token", "TAR"); // ✅ Додали параметри!
   await token.waitForDeployment();
