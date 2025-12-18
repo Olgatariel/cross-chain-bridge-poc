@@ -1,32 +1,38 @@
-# Cross-chain Bridge PoC
+# PoC Bridge Project
 
-This repository contains a simple proof of concept for experimenting with
-token interactions and preparing for cross-chain / bridge logic.
+This is my Proof-of-Concept (PoC) project for moving tokens between two blockchains.
 
-## Overview
+## Goal
 
-The contracts in this project are intentionally minimal.
-They are not production-ready and are designed only to demonstrate
-basic token flow and contract-to-contract interaction.
+The project shows a simple “bridge” logic for tokens between two blockchains without any currency exchange.
 
-The main focus is on future bridge integration rather than complex
-token or business logic.
+## How it works
+
+1. **Blockchain A (Base Sepolia)**  
+   - The user has some `Token1`.  
+   - The user locks some tokens in the `TokenConsumer` contract.
+
+2. **Bridge / message**  
+   - After locking, a message with the amount goes through the bridge to blockchain B.
+   Bridge / message
+	- TokenConsumer (on chain A) and VirtualBalanceVault (on chain B) are the contracts that interact with Avail to transmit messages and tokens between chains.
+	- After tokens are locked in TokenConsumer, a message with the amount is sent through the bridge to VirtualBalanceVault.
+
+3. **Blockchain B (Polygon Amoy)**  
+   - The `VirtualBalanceVault` contract receives the message and gives the user the same amount of tokens on this chain.  
+   - The user will just see in the app that their balance on chain A went down and the balance on chain B went up.
 
 ## Contracts
 
-- `Token.sol` — simple ERC-20 token used as a test asset
-- `TokenConsumer.sol` — contract that receives tokens via `transferFrom`
+- `Token1.sol` – a simple ERC-20 token.  
+- `TokenConsumer.sol` – contract on chain A to lock tokens.  
+- `VirtualBalanceVault.sol` – contract on chain B to track and give tokens to users
 
-## Tests
+## Scripts
 
-Unit tests cover:
-- token deployment and balances
-- approve / allowance logic
-- token deposit into the consumer contract
-- failure scenarios (insufficient allowance / balance)
+- `deployToken.js` – deploys the token.  
+- `deployConsumer.js` – deploys TokenConsumer.  
+- `deployVirtualBalanceVault.js` – deploys VirtualBalanceVault.  
+- `interactPoC.js` – example of user interacting with the contracts.
 
-## Running tests
-
-```bash
-npm install
-npx hardhat test
+---
