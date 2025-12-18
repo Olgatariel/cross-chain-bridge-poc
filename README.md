@@ -14,7 +14,6 @@ The project shows a simple “bridge” logic for tokens between two blockchains
 
 2. **Bridge / message**  
    - After locking, a message with the amount goes through the bridge to blockchain B.
-   Bridge / message
 	- TokenConsumer (on chain A) and VirtualBalanceVault (on chain B) are the contracts that interact with Avail to transmit messages and tokens between chains.
 	- After tokens are locked in TokenConsumer, a message with the amount is sent through the bridge to VirtualBalanceVault.
 
