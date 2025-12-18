@@ -28,9 +28,9 @@ contract VirtualBalanceVault {
     }
 
     /**
-     * @notice Relayer credits virtual balance to user (called after verifying lock on chain A)
-     * @param user User address to credit
-     * @param amount Amount to credit
+     * @notice Relayer credits virtual balance to user (should called after verifying lock on chain A)
+     * @param user address to credit
+     * @param amount to credit
      */
     function credit(address user, uint256 amount) external onlyRelayer {
         if (user == address(0)) revert ZeroAddress();
@@ -42,7 +42,6 @@ contract VirtualBalanceVault {
 
     /**
      * @notice User spends their virtual balance
-     * @param amount Amount to spend
      */
     function spend(uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
@@ -64,7 +63,7 @@ contract VirtualBalanceVault {
     }
     
     /**
-     * @notice Update relayer address (only current relayer can call)
+     * @notice Update relayer address (only current relayer can call it)
      * @param newRelayer New relayer address
      */
     function updateRelayer(address newRelayer) external onlyRelayer {

@@ -56,7 +56,6 @@ contract TokenConsumer {
     function getBalance() external view returns (uint256) {
         return token.balanceOf(address(this));
     }
-
     function getDepositsCount(address user)
         external
         view
@@ -64,7 +63,6 @@ contract TokenConsumer {
     {
         return deposits[user].length;
     }
-
     function getDeposit(
         address user,
         uint256 index

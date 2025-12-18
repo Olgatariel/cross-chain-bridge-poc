@@ -1,67 +1,32 @@
-# TAR Ecosystem Smart Contracts
+# Cross-chain Bridge PoC
 
-TAR DeFi Ecosystem (Work in Progress)
+This repository contains a simple proof of concept for experimenting with
+token interactions and preparing for cross-chain / bridge logic.
 
-This repository contains the core smart contracts of the TAR DeFi ecosystem.
-The goal of the project is to build a simple, modular, and transparent token-based system that includes:
+## Overview
 
-• TAR Token (ERC-20)
+The contracts in this project are intentionally minimal.
+They are not production-ready and are designed only to demonstrate
+basic token flow and contract-to-contract interaction.
 
-A fixed-supply token used as the main asset inside the ecosystem.
-It serves as the currency sold during the Crowdsale and later can be transferred into staking, vesting, rewards, or future modules.
+The main focus is on future bridge integration rather than complex
+token or business logic.
 
-• Treasury Contract
+## Contracts
 
-A central vault responsible for holding ETH and TAR tokens.
-In the final architecture, the Treasury will work as the main financial hub:
-• receives ETH from the Crowdsale (after successful finalization)
-• stores tokens and ETH for future protocol components
-• interacts only with authorized contracts (not directly with end-users)
+- `Token.sol` — simple ERC-20 token used as a test asset
+- `TokenConsumer.sol` — contract that receives tokens via `transferFrom`
 
-• Crowdsale Contract
+## Tests
 
-A multi-round token sale mechanism with customizable parameters such as:
-• rates per round
-• min/max buy limits
-• individual caps
-• whitelist support
-• round-based hard caps
-• global hard cap
-• soft cap and refund logic
+Unit tests cover:
+- token deployment and balances
+- approve / allowance logic
+- token deposit into the consumer contract
+- failure scenarios (insufficient allowance / balance)
 
-ETH collected during the sale does not go directly to the owner;
-instead, after successful completion, all raised ETH is transferred to the Treasury, keeping the separation between sale logic and fund storage.
-
-This separation of responsibilities makes the system more maintainable and closer to real DeFi architecture, where token sale, fund storage, and utility modules are cleanly separated.
-
-## 📂 Structure
-
-System Logic Overview 1. Users buy TAR tokens in Crowdsale → ETH temporarily stays inside the Crowdsale until finalization → Tokens are transferred to buyers (current version) or locked (future version). 2. When the softCap is reached and all rounds end → Crowdsale finalizes the sale → All accumulated ETH is sent into the Treasury contract. 3. The Treasury becomes the financial layer. Future modules (staking, vesting, governance, savings pools) will operate against it:
-• pulling TAR/ETH from Treasury through controlled, authorized functions
-• ensuring secure and isolated fund management
-
-## Personal Notes
-
-These are my own notes about things I want to improve in the future:
-
-1. Token distribution during Crowdsale
-
-Right now buyers receive tokens immediately after each purchase.
-It works, but it’s not ideal for a real token sale.
-
-If the softCap is not reached, buyers can refund ETH, but they still keep the tokens.
-Later I want to implement a system where purchased tokens are locked and released only after finalizeSale() confirms success.
-
-2. HardCap aggregation
-
-I’m currently calculating total hardCap for all rounds using a loop.
-I think it would be better to replace this with a dedicated variable to reduce gas usage and simplify the logic.
-
-3. Additional modules planned
-
-## Deployment
+## Running tests
 
 ```bash
-npx hardhat compile
-npx hardhat run scripts/deploy.js --network sepolia
-```
+npm install
+npx hardhat test
