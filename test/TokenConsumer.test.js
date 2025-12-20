@@ -1,12 +1,14 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("TokenConsumer", function() {
+describe("TokenConsumer", function () {
     let consumer;
     let token;
     let owner, user1;
 
-    beforeEach(async function() {
+    const DEST_CHAIN_ID = 137; // Polygon
+
+    beforeEach(async function () {
         [owner, user1] = await ethers.getSigners();
 
         const Token = await ethers.getContractFactory("Token1");
@@ -18,51 +20,84 @@ describe("TokenConsumer", function() {
         await consumer.waitForDeployment();
     });
 
-    describe("Deployment", () => {
-        it("Should deposit tokens correctly", async () => {
-            const depositAmount = ethers.parseEther("100");
+    describe("deposit", function () {
+        it("Should deposit tokens correctly and emit event", async function () {
+            const amount = ethers.parseEther("100");
 
-            await token.approve(consumer.target, depositAmount);
+            await token.approve(consumer.target, amount);
 
-            const allowanceBefore = await token.allowance(owner.address, consumer.target);
-            expect(allowanceBefore).to.equal(depositAmount);
+            await expect(
+                consumer.deposit(amount, DEST_CHAIN_ID)
+            )
+                .to.emit(consumer, "DepositIntent")
+                .withArgs(owner.address, amount, DEST_CHAIN_ID);
 
-            await consumer.deposit(depositAmount);
+            expect(await token.balanceOf(owner.address))
+                .to.equal(ethers.parseEther("900"));
 
-            const ownerBalanceAfter = await token.balanceOf(owner.address);
-            const consumerBalance = await token.balanceOf(consumer.target);
-        
-            expect(ownerBalanceAfter).to.equal(ethers.parseEther("900")); 
-            expect(consumerBalance).to.equal(depositAmount);
+            expect(await token.balanceOf(consumer.target))
+                .to.equal(amount);
 
-            const remainingAllowance = await token.allowance(owner.address, consumer.target);
-            expect(remainingAllowance).to.equal(0);
-        }); 
-
-        it("Should fail if deposit exceeds allowance", async () => {
-            const depositAmount = ethers.parseEther("100");
-            await token.approve(consumer.target, ethers.parseEther("50"));
-            await expect(consumer.deposit(depositAmount))
-                .to.be.revertedWithCustomError(token, "ERC20InsufficientAllowance");
-            
-            const ownerBalance = await token.balanceOf(owner.address);
-            const consumerBalance = await token.balanceOf(consumer.target);
-            
-            expect(ownerBalance).to.equal(ethers.parseEther("1000"));
-            expect(consumerBalance).to.equal(0);
+            const deposit = await consumer.getDeposit(owner.address, 0);
+            expect(deposit.amount).to.equal(amount);
+            expect(deposit.destinationChainId).to.equal(DEST_CHAIN_ID);
         });
 
-        it("Should fail if deposit exceeds owner balance", async () => {
-            const depositAmount = ethers.parseEther("1100"); 
-            await token.approve(consumer.target, depositAmount); 
-            await expect(consumer.deposit(depositAmount))
-                .to.be.revertedWithCustomError(token, "ERC20InsufficientBalance");
-            
-            const ownerBalance = await token.balanceOf(owner.address);
-            const consumerBalance = await token.balanceOf(consumer.target);
-            
-            expect(ownerBalance).to.equal(ethers.parseEther("1000"));
-            expect(consumerBalance).to.equal(0);
+        it("Should revert if amount is zero", async function () {
+            await expect(
+                consumer.deposit(0, DEST_CHAIN_ID)
+            ).to.be.revertedWithCustomError(consumer, "ZeroAmount");
+        });
+
+        it("Should revert if destinationChainId is zero", async function () {
+            const amount = ethers.parseEther("10");
+
+            await token.approve(consumer.target, amount);
+
+            await expect(
+                consumer.deposit(amount, 0)
+            ).to.be.revertedWithCustomError(consumer, "InvalidDestination");
+        });
+
+        it("Should revert if allowance is insufficient", async function () {
+            const amount = ethers.parseEther("100");
+
+            await token.approve(consumer.target, ethers.parseEther("50"));
+
+            await expect(
+                consumer.deposit(amount, DEST_CHAIN_ID)
+            ).to.be.revertedWithCustomError(
+                token,
+                "ERC20InsufficientAllowance"
+            );
+
+            expect(await token.balanceOf(consumer.target)).to.equal(0);
+        });
+
+        it("Should revert if balance is insufficient", async function () {
+            const amount = ethers.parseEther("1100");
+
+            await token.approve(consumer.target, amount);
+
+            await expect(
+                consumer.deposit(amount, DEST_CHAIN_ID)
+            ).to.be.revertedWithCustomError(
+                token,
+                "ERC20InsufficientBalance"
+            );
+
+            expect(await token.balanceOf(consumer.target)).to.equal(0);
+        });
+
+        it("Should correctly increase deposits count", async function () {
+            const amount = ethers.parseEther("50");
+
+            await token.approve(consumer.target, amount);
+            await consumer.deposit(amount, DEST_CHAIN_ID);
+
+            expect(
+                await consumer.getDepositsCount(owner.address)
+            ).to.equal(1);
         });
     });
 });
