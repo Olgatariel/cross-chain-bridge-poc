@@ -44,8 +44,8 @@ async function checkForEvents() {
         
         if (lastBlock === 0) {
             lastBlock = currentBlock - 1;
-            console.log(`✅ Connected to Base Sepolia. Current block: ${currentBlock}`);
-            console.log("📡 Listening for DepositIntent events...\n");
+            console.log(` Connected to Base Sepolia. Current block: ${currentBlock}`);
+            console.log(" Listening for DepositIntent events...\n");
         }
         
         if (currentBlock > lastBlock) {
@@ -57,7 +57,7 @@ async function checkForEvents() {
             
             if (events.length > 0) {
                 for (const event of events) {
-                    console.log("\n🔔 ═══ DepositIntent detected! ═══");
+                    console.log("\n ═══ DepositIntent detected! ═══");
                     console.log("User:", event.args.user);
                     console.log("Amount:", ethers.formatEther(event.args.amount), "tokens");
                     console.log("Destination chain:", event.args.destinationChainId.toString());

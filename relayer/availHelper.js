@@ -24,7 +24,7 @@ async function initializeAvail() {
     }
     
     account = Account.new(seed);
-    console.log("✅ Avail initialized. Account:", account.address);
+    console.log(" Avail initialized. Account:", account.address);
 }
 
 async function submitToAvail(user, amount, nonce) {
