@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+// Tests for VirtualBalanceVault - destination chain virtual balance management
 describe("VirtualBalanceVault", function () {
   let vault;
   let owner, user1, user2, relayer, newRelayer;
@@ -19,6 +20,7 @@ describe("VirtualBalanceVault", function () {
     });
   });
 
+  // Test relayer crediting virtual balances
   describe("Credit", function () {
     it("Should allow relayer to credit balance", async function () {
       const amount = ethers.parseEther("100");
@@ -47,10 +49,12 @@ describe("VirtualBalanceVault", function () {
     });
   });
 
+  // Test users spending their virtual balance
   describe("Spend", function () {
     const amount = ethers.parseEther("100");
 
     beforeEach(async function () {
+      // Setup: credit user first
       await vault.connect(relayer).credit(user1.address, amount);
     });
 
@@ -76,6 +80,7 @@ describe("VirtualBalanceVault", function () {
     });
   });
 
+  // Test relayer role transfer
   describe("Relayer update", function () {
     it("Should allow current relayer to update relayer", async function () {
       await vault.connect(relayer).updateRelayer(newRelayer.address);

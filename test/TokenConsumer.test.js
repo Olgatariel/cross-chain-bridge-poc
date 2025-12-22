@@ -8,6 +8,7 @@ describe("TokenConsumer", function () {
 
     const DEST_CHAIN_ID = 137; // Polygon
 
+    // Setup: can deploy fresh contracts before each test
     beforeEach(async function () {
         [owner, user1] = await ethers.getSigners();
 
@@ -21,6 +22,7 @@ describe("TokenConsumer", function () {
     });
 
     describe("deposit", function () {
+        // Happy path: successful deposit with event emission
         it("Should deposit tokens correctly and emit event", async function () {
             const amount = ethers.parseEther("100");
 
@@ -43,6 +45,7 @@ describe("TokenConsumer", function () {
             expect(deposit.destinationChainId).to.equal(DEST_CHAIN_ID);
         });
 
+        // Error cases: invalid inputs
         it("Should revert if amount is zero", async function () {
             await expect(
                 consumer.deposit(0, DEST_CHAIN_ID)
@@ -59,6 +62,7 @@ describe("TokenConsumer", function () {
             ).to.be.revertedWithCustomError(consumer, "InvalidDestination");
         });
 
+        // Error cases: insufficient funds/allowance
         it("Should revert if allowance is insufficient", async function () {
             const amount = ethers.parseEther("100");
 
@@ -89,6 +93,7 @@ describe("TokenConsumer", function () {
             expect(await token.balanceOf(consumer.target)).to.equal(0);
         });
 
+        // Verify deposit tracking works correctly
         it("Should correctly increase deposits count", async function () {
             const amount = ethers.parseEther("50");
 

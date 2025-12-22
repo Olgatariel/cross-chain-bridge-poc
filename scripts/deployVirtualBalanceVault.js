@@ -1,17 +1,29 @@
-// scripts/deployVirtualBalanceVault.js
 const { ethers } = require("hardhat");
 
 async function main() {
-  const [deployer, relayer] = await ethers.getSigners();
+  
+  const [deployer] = await ethers.getSigners();
 
-  console.log("Deploying contracts with deployer:", deployer.address);
-  console.log("Relayer address:", relayer.address);
+  console.log("=== Deploying to Polygon Amoy ===");
+  console.log("Deployer (will be relayer):", deployer.address);
+  
+  const balance = await ethers.provider.getBalance(deployer.address);
+  console.log("Balance:", ethers.formatEther(balance), "MATIC");
+
+  const relayerAddress = deployer.address;
+  
+  console.log("\n--- Deploying VirtualBalanceVault ---");
+  console.log("Relayer address:", relayerAddress);
 
   const VirtualBalanceVault = await ethers.getContractFactory("VirtualBalanceVault");
-  const vault = await VirtualBalanceVault.deploy(relayer.address);
+  const vault = await VirtualBalanceVault.deploy(relayerAddress);
   await vault.waitForDeployment();
 
-  console.log("VirtualBalanceVault deployed at:", await vault.getAddress());
+  const vaultAddress = await vault.getAddress();
+  console.log(" VirtualBalanceVault deployed to:", vaultAddress);
+  
+  console.log("\nView on explorer:");
+  console.log(`https://www.oklink.com/amoy/address/${vaultAddress}`);
 }
 
 main().catch((error) => {

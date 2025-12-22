@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+/// @title Locks tokens on Base for bridging
 contract TokenConsumer {
 
     //errors
@@ -11,7 +12,8 @@ contract TokenConsumer {
     error TransferFailed();
 
     //events
-        event DepositIntent(
+    /// @notice Emitted when user locks tokens for bridge transfer
+    event DepositIntent(
         address indexed user,
         uint256 amount,
         uint256 destinationChainId
@@ -21,18 +23,20 @@ contract TokenConsumer {
     IERC20 public immutable token;
 
     //structs
-        struct Deposit {
+    /// @notice Tracks each deposit with target chain
+    struct Deposit {
         uint256 amount;
         uint256 destinationChainId;
     }
     mapping(address => Deposit[]) public deposits;
 
     //constructor
-        constructor(address tokenAddress) {
+    constructor(address tokenAddress) {
         token = IERC20(tokenAddress);
     }
 
     //functions
+    /// @notice Lock tokens and emit event for relayer
     function deposit(
         uint256 amount,
         uint256 destinationChainId
@@ -53,9 +57,12 @@ contract TokenConsumer {
         );
         emit DepositIntent(msg.sender, amount, destinationChainId);
     }
+    
+    /// @notice Total tokens locked in contract
     function getBalance() external view returns (uint256) {
         return token.balanceOf(address(this));
     }
+    
     function getDepositsCount(address user)
         external
         view
@@ -63,6 +70,7 @@ contract TokenConsumer {
     {
         return deposits[user].length;
     }
+    
     function getDeposit(
         address user,
         uint256 index
