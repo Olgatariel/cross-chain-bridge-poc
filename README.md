@@ -43,29 +43,28 @@ TokenConsumer (on chain A) and VirtualBalanceVault (on chain B) are the contract
    - `interactPoC.js` – example of user interacting with the contracts.
 
 ## Architecture
-
+```
 User
-│
-│  deposit(Token1)
-▼
+  |
+  | deposit(Token1)
+  ▼
 TokenConsumer
 (Base Sepolia)
-│
-│  DepositIntent event
-▼
+  |
+  | DepositIntent event
+  ▼
 Relayer
-│
-│  submit message
-▼
+  |
+  | submit message
+  ▼
 Avail DA
-│
-│  confirmation
-▼
+  |
+  | confirmation
+  ▼
 Relayer
-│
-│  execute message
-▼
+  |
+  | execute message
+  ▼
 VirtualBalanceVault
 (Polygon Amoy)
-
----
+```
