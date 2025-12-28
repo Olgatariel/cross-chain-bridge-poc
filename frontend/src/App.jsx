@@ -184,13 +184,13 @@ function App() {
 
         {/* Компактний Info */}
         <div className="bg-white/90 backdrop-blur rounded-lg p-3 text-center">
-          <p className="text-xs text-gray-600">
-            <strong>Note:</strong> Relayer must be running
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {CONSUMER_ADDRESS.slice(0, 6)}...{CONSUMER_ADDRESS.slice(-4)}
-          </p>
-        </div>
+        <p className="text-xs text-gray-600">
+           <strong>POC Demo</strong> - Automated relayer processes bridge transactions
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Contract: {CONSUMER_ADDRESS.slice(0, 6)}...{CONSUMER_ADDRESS.slice(-4)}
+        </p>
+      </div>
       </div>
     </div>
   );
