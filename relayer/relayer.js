@@ -14,8 +14,12 @@ const providerB = new ethers.JsonRpcProvider(process.env.RPC_CHAIN_B);
 
 const walletB = new ethers.Wallet(process.env.PRIVATE_KEY, providerB);
 
-const TokenConsumerABI = require("../artifacts/contracts/PoC-Bridge/TokenConsumer.sol/TokenConsumer.json").abi;
-const VaultABI = require("../artifacts/contracts/PoC-Bridge/VirtualBalanceVault.sol/VirtualBalanceVault.json").abi;
+const TokenConsumerABI = [
+    "event DepositIntent(address indexed user, uint256 amount, uint256 indexed nonce, uint256 indexed destinationChainId)",
+  ];
+  const VaultABI = [
+    "function credit(address user, uint256 amount) external",
+  ];
 
 const tokenConsumerAddress = "0x787f3F838a126491F651207Bb575E07D9a95Da5b";
 const vaultAddress = "0x46BFEbbb31042ee6b0315612830Bb056Eb2443Af";
