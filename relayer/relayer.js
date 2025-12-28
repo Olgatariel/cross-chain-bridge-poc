@@ -15,7 +15,17 @@ const providerB = new ethers.JsonRpcProvider(process.env.RPC_CHAIN_B);
 const walletB = new ethers.Wallet(process.env.PRIVATE_KEY, providerB);
 
 const TokenConsumerABI = [
-    "event DepositIntent(address indexed user, uint256 amount, uint256 indexed nonce, uint256 indexed destinationChainId)",
+    {
+      anonymous: false,
+      inputs: [
+        { indexed: true, name: "user", type: "address" },
+        { indexed: false, name: "amount", type: "uint256" },
+        { indexed: true, name: "nonce", type: "uint256" },
+        { indexed: true, name: "destinationChainId", type: "uint256" }
+      ],
+      name: "DepositIntent",
+      type: "event"
+    }
   ];
   const VaultABI = [
     "function credit(address user, uint256 amount) external",
