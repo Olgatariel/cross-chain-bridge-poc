@@ -9,10 +9,9 @@
     "dependencies": {
       "ethers": "^6.16.0",
       "dotenv": "^16.4.7",
-      "avail-js-sdk": "^1.1.2"
+      "@availproject/avail-js-sdk": "0.2.1"
     },
     "engines": {
       "node": ">=18.0.0"
     }
   }
-  
