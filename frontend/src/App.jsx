@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, formatEther } from 'viem';
+import { parseEther, formatEther, createPublicClient, http } from 'viem';
+import { polygonAmoy } from 'wagmi/chains';
 
 const TOKEN_ADDRESS = '0x46BFEbbb31042ee6b0315612830Bb056Eb2443Af';
 const CONSUMER_ADDRESS = '0x787f3F838a126491F651207Bb575E07D9a95Da5b';
@@ -50,9 +51,16 @@ const VAULT_ABI = [
   },
 ];
 
+
+const polygonClient = createPublicClient({
+  chain: polygonAmoy,
+  transport: http(),
+});
+
 function App() {
   const [amount, setAmount] = useState('');
   const [step, setStep] = useState(0);
+  const [polygonBalance, setPolygonBalance] = useState(0n);
   
   const { address, isConnected } = useAccount();
 
@@ -65,15 +73,29 @@ function App() {
     query: { enabled: !!address },
   });
 
-  // Polygon Amoy Virtual Balance
-  const { data: polygonBalance, refetch: refetchPolygonBalance } = useReadContract({
-    address: VAULT_ADDRESS,
-    abi: VAULT_ABI,
-    functionName: 'getBalance',
-    args: [address],
-    chainId: 80002,
-    query: { enabled: !!address },
-  });
+  
+  useEffect(() => {
+    if (!address) return;
+    
+    const fetchPolygonBalance = async () => {
+      try {
+        const data = await polygonClient.readContract({
+          address: VAULT_ADDRESS,
+          abi: VAULT_ABI,
+          functionName: 'getBalance',
+          args: [address],
+        });
+        setPolygonBalance(data);
+      } catch (error) {
+        console.error('Error fetching Polygon balance:', error);
+      }
+    };
+
+    fetchPolygonBalance();
+    const interval = setInterval(fetchPolygonBalance, 10000); 
+    
+    return () => clearInterval(interval);
+  }, [address, step]);
 
   const { data: approveHash, writeContract: approve } = useWriteContract();
   const { isLoading: isApproving } = useWaitForTransactionReceipt({
@@ -123,7 +145,6 @@ function App() {
       setStep(0);
       setAmount('');
       refetchBalance();
-      refetchPolygonBalance();
     }, 3000);
   }
 
@@ -158,7 +179,7 @@ function App() {
               <div className="bg-blue-50 rounded-lg p-3 mb-4 text-center">
                 <p className="text-xs text-gray-600 mb-1">Polygon Amoy (Virtual)</p>
                 <p className="text-xl font-bold text-blue-600">
-                  {polygonBalance ? formatEther(polygonBalance) : '0.0'} TKN1
+                  {formatEther(polygonBalance)} TKN1
                 </p>
               </div>
 
@@ -205,7 +226,7 @@ function App() {
                   <p className="text-xs text-yellow-800 text-center">
                     {step === 1 && 'Step 1/2: Approving...'}
                     {step === 2 && !isDepositSuccess && 'Step 2/2: Depositing...'}
-                    {isDepositSuccess && '✅ Success! Balances will update...'}
+                    {isDepositSuccess && '✅ Success! Balances updating...'}
                   </p>
                 </div>
               )}

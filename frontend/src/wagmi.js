@@ -3,7 +3,7 @@ import { baseSepolia, polygonAmoy } from 'wagmi/chains';
 
 export const config = getDefaultConfig({
   appName: 'Cross-Chain Bridge',
-  projectId: 'YOUR_PROJECT_ID', // Отримаємо пізніше від WalletConnect
+  projectId: 'c0592a358c9b4c2a99ad058ff5f8c9a2', 
   chains: [baseSepolia, polygonAmoy],
   ssr: false,
 });
