@@ -370,9 +370,16 @@ my-hardhat-ignition/
 
 ## Future Improvements
 
-- Add withdraw functionality (convert virtual balance back to real tokens)
-- Implement proper token minting on destination chain instead of virtual balance
-- Add security features (rate limiting, maximum bridge amounts)
-- Support multiple tokens
-- Add reverse bridge (Polygon → Base)
-- Implement proper signature verification for additional security
+1. **Real token minting** - Replace virtual balance with wrapped tokens (wTKN1) that can be transferred between users
+
+2. **Bidirectional bridge** - Add reverse bridge (Polygon → Base) with withdraw functionality
+
+3. **Multi-token support** - Extend to support multiple ERC-20 tokens (USDC, DAI, WETH)
+
+4. **Security features** - Add rate limiting, maximum bridge amounts, pause mechanism, and multi-sig requirements
+
+5. **Signature verification** - Implement cryptographic proof verification in contracts instead of trusting relayer
+
+6. **Price oracle integration** - Add Chainlink oracles for real-time token price feeds
+
+7. **DEX functionality** - Enable currency exchange during bridge (e.g., bridge TKN1 → receive USDC on destination chain at current market rate with slippage protection)
