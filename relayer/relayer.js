@@ -15,17 +15,7 @@ const providerB = new ethers.JsonRpcProvider(process.env.RPC_CHAIN_B);
 const walletB = new ethers.Wallet(process.env.PRIVATE_KEY, providerB);
 
 const TokenConsumerABI = [
-    {
-      anonymous: false,
-      inputs: [
-        { indexed: true, name: "user", type: "address" },
-        { indexed: false, name: "amount", type: "uint256" },
-        { indexed: true, name: "nonce", type: "uint256" },
-        { indexed: true, name: "destinationChainId", type: "uint256" }
-      ],
-      name: "DepositIntent",
-      type: "event"
-    }
+    "event DepositIntent(address indexed user, uint256 amount, uint256 destinationChainId)"
   ];
   const VaultABI = [
     "function credit(address user, uint256 amount) external",
@@ -57,42 +47,44 @@ async function checkForEvents() {
         const currentBlock = await providerA.getBlockNumber();
         
         if (lastBlock === 0) {
-            lastBlock = currentBlock - 1;
-            console.log(` Connected to Base Sepolia. Current block: ${currentBlock}`);
-            console.log(" Listening for DepositIntent events...\n");
+            lastBlock = currentBlock - 50;
+            console.log(`✅ Connected to Base Sepolia. Current block: ${currentBlock}`);
+            console.log(`📍 Starting from block: ${lastBlock}`);
+            console.log("📡 Listening for DepositIntent events...\n");
         }
         
         if (currentBlock > lastBlock) {
             const fromBlock = lastBlock + 1;
             const toBlock = Math.min(fromBlock + MAX_BLOCK_RANGE - 1, currentBlock);
             
+            console.log(`🔎 Scanning blocks ${fromBlock} to ${toBlock}...`); // ДОДАНО!
+            
             const filter = tokenConsumer.filters.DepositIntent();
             const events = await tokenConsumer.queryFilter(filter, fromBlock, toBlock);
             
+            console.log(`   Found ${events.length} events`); // ДОДАНО!
+            
             if (events.length > 0) {
                 for (const event of events) {
-                    console.log("\n ═══ DepositIntent detected! ═══");
+                    console.log("\n🔔 ═══ DepositIntent detected! ═══");
                     console.log("User:", event.args.user);
                     console.log("Amount:", ethers.formatEther(event.args.amount), "tokens");
-                    console.log("Destination chain:", event.args.destinationChainId.toString());
                     console.log("Block:", event.blockNumber);
                     console.log("Transaction:", event.transactionHash);
+                    console.log("Event args:", event.args); // ДОДАНО для debug!
                     
-                    await handleIntent(event.args.user, event.args.amount, event.blockNumber);
+                    await handleIntent(event.args.user, event.args.amount, event.args.destinationChainId);
                 }
             }
             
             lastBlock = toBlock;
         }
     } catch (error) {
-        
         if (!error.message.includes("10 block range")) {
-            console.error("Error checking events:", error.message);
+            console.error("❌ Error checking events:", error.message);
         }
     }
 }
-
-setInterval(checkForEvents, 3000);
 
 async function handleIntent(user, amount, nonce) {
     try {
@@ -124,4 +116,5 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
+setInterval(checkForEvents, 3000);
 checkForEvents();
