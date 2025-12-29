@@ -35,7 +35,7 @@ async function submitToAvail(user, amount, nonce) {
     const bridgeData = {
         user: user,
         amount: amount.toString(),
-        nonce: nonce,
+        nonce: nonce.toString(),
         timestamp: Date.now(),
         sourceChain: "Base Sepolia"
     };
