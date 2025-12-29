@@ -59,7 +59,7 @@ contract VirtualBalanceVault {
      * @return Virtual balance
      */
     function getBalance(address user) external view returns (uint256) {
-        return virtualBalance[user];
+    return virtualBalance[user] / 1e18;
     }
     
     /**

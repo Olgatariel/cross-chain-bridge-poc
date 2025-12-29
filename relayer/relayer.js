@@ -57,12 +57,12 @@ async function checkForEvents() {
             const fromBlock = lastBlock + 1;
             const toBlock = Math.min(fromBlock + MAX_BLOCK_RANGE - 1, currentBlock);
             
-            console.log(`🔎 Scanning blocks ${fromBlock} to ${toBlock}...`); // ДОДАНО!
+            console.log(`🔎 Scanning blocks ${fromBlock} to ${toBlock}...`); 
             
             const filter = tokenConsumer.filters.DepositIntent();
             const events = await tokenConsumer.queryFilter(filter, fromBlock, toBlock);
             
-            console.log(`   Found ${events.length} events`); // ДОДАНО!
+            console.log(`   Found ${events.length} events`); 
             
             if (events.length > 0) {
                 for (const event of events) {
@@ -71,7 +71,7 @@ async function checkForEvents() {
                     console.log("Amount:", ethers.formatEther(event.args.amount), "tokens");
                     console.log("Block:", event.blockNumber);
                     console.log("Transaction:", event.transactionHash);
-                    console.log("Event args:", event.args); // ДОДАНО для debug!
+                    console.log("Event args:", event.args); 
                     
                     await handleIntent(event.args.user, event.args.amount, event.args.destinationChainId);
                 }

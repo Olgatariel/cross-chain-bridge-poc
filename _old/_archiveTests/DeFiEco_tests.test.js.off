@@ -1,0 +1,25 @@
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+const { time } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+
+describe("Treasury", function() {
+    let user1;
+    let treasury;
+
+    beforeEach(async function() {
+        [user1] = await ethers.getSigners();
+        const Treasury = await ethers.getContractFactory("Treasury");
+        treasury = await Treasury.deploy(ethers.parseEther("1"));
+        await treasury.waitForDeployment();
+    });
+    it("should receive ethers from user");
+
+    await expect(
+        treasury.connect(user1).receive({ value: ethers.parseEther("5")})
+    ).to. emit(treasury, "Received");
+
+
+
+
+
+})
