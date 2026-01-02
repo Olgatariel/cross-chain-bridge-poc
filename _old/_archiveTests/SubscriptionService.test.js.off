@@ -1,0 +1,50 @@
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+describe ("VirtualBalanceVault", function () {
+    let vault;
+    let owner, user1, user2, relayer, newRelayer;
+
+    beforeEach (async function(){
+        [owner, user1, user2, relayer, newRelayer] = await ethers.getSigners();
+
+        const Vault = await ethers.getContractFactory("VirtualBalanceVault");
+        vault = await Vault.deploy(relayer.address);
+        await vault.waitForDeployment();
+    })
+    describe("credit", function () {
+        it("should allow relayer to credit tokens", async function() {
+            const amount = ethers.parseEther("100");
+
+            await vault.connect(relayer).credit(user1.address,amount);
+            expect (await vault.getBalance(user1)).to.equal(amount);
+        });
+        it("should revert when call Non-relayer", async function(){
+            const amount = ethers.parseEther("100");
+
+            await expect (vault.connect(user1).credit(user2, amount)
+        ).to.be.revertedWithCustomError(vault,"NotRelayer");
+        });
+        it("should revert if amount is 0", async function(){
+            const amount = ethers.parseEther("0");
+
+            await expect(vault.connect(relayer).credit(user1, amount)
+        ).to.be.revertedWithCustomError(vault, "ZeroAmount");
+
+
+
+
+        })
+
+
+
+
+    })
+
+
+
+
+
+
+
+})

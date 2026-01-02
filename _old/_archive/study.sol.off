@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+
+
+contract Crowdsale is Ownable, ReentrancyGuard, Pausable {
+     using SafeERC20 for IERC20;
+     using Address for address payable;
+
+    //errors
+    error HardCapExceeded();
+    error ZeroAmount();
+
+
+
+    //events
+    event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokensAmount);
+    event FundsWithdrawn(address indexed contract, uint256 balance);
+
+
+    //state variables
+    IERC20 public token;
+    address public treasury;
+    uint256 public hardcup = 10 ether;
+    uint256 public rate = 1000;
+    uint256 public totalRaised;
+
+    mapping (address => uint256) public contributions;
+
+    //constructor
+    constructor(address _token, address _treasury) Ownable(msg.sender) {
+        if(_token ==address(0) || _treasury == address(0)) {
+            revert ZeroAddress();
+        }
+        token = IERC20(_token)
+        treasury = _treasury;
+    }
+
+
+    function buyTokens () external payable whenNotPaused nonReentrant {
+        if(msg.value == 0) revert ZeroAmount():
+        if(msg.value + totalRaised > hardcup) revert HardCapExceeded();
+
+        uint256 tokenAmount = msg.value * rate;
+        if(token.balanceOf(address(this)) < tokenAmount) revert InsufficientTokenBalance();
+
+        totalRaised += msg.value;
+        contributions[msg.sender] += msg.value;
+        token.safeTransfer(msg.sender, tokenAmount);
+        emit TokensPurchased(msg.sender, msg.value, tokenAmount);
+    }
+    function withdraw()external onlyOwner {
+        uint256 balance = address(this).balance;
+        payable(treasury).sendValue(balance);
+        emit FundsWithdrawn(treasury, balance);
+        }
+    }
+
+
+
+
+
+}

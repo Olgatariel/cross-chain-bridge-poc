@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+/**
+ * @title Staking Contract
+ * @notice Users can stake their tokens for some period and unstake with bonus
+ * @dev All tokens are stored in Treasury contract
+ * @author Tariielashvili O.
+ */
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+contract Staking is ReentrancyGuard, Ownable, Pausable {
+
+    //events
+
+
+    //errors
+    error InvalidAddress();
+
+
+    //State variables
+    uint256 public minLockPeriod = 180 days;
+    uint256 public APR = 15;
+    uint256 public penalty = 10;
+
+    //structura,mapping
+    struct StakeInfo {
+        uint256 amount;
+        uint256 startTime;
+        uint256 lockPeriod;
+        bool withdrawn;
+    }
+
+    mapping (address => )
+
+
+
+
+
+    // modifiers
+
+
+
+
+
+
+    //constructor
+        constructor(
+        address _token
+    ) Ownable(msg.sender) ReentrancyGuard() Pausable() {
+        if (_token == address(0)) revert InvalidAddress();
+        token = IERC20(_token);
+    }
+
+
+
+
+
+
+
+}

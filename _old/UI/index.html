@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freelance Escrow UI</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        background-color: #f9fafc;
+        margin-top: 40px;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input {
+      padding: 8px;
+      width: 250px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-top: 5px;
+    }
+
+    button {
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+      transition: background-color 0.2s ease;
+    }
+
+    .connect { background-color: #007bff; }   
+    .create { background-color: #4CAF50; }    
+    .approve { background-color: #f39c12; }   
+
+    button:hover {
+    opacity: 0.9;
+    }
+
+    hr {
+      margin: 30px 0;
+    }
+
+    section {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      width: 400px;
+      margin: 0 auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+</style>
+</head>
+
+<body>
+  <h1>Freelance Escrow Demo</h1>
+
+  <button id="connectButton" class="connect"> Connect MetaMask</button>
+  <p id="account"></p>
+
+  <hr>
+
+   <section>
+    <h2>Create Deal</h2>
+    <label>Freelancer address:</label><br>
+    <input id="freelancerAddress" placeholder="0x..." size="45"><br><br>
+
+    <label>Duration (seconds):</label><br>
+    <input id="duration" type="number" placeholder="604800"><br><br>
+
+    <label>Amount (ETH):</label><br>
+    <input id="amount" type="text" placeholder="0.1"><br><br>
+
+    <button id="createDealButton" class="create"> Create Deal</button>
+  </section>
+
+  <section style="margin-top: 30px;">
+    <h2>Approve Work</h2>
+    <label>Deal ID:</label><br>
+    <input id="dealIdApprove" type="number" placeholder="1"><br><br>
+    <button id="approveButton" class="approve"> Approve Work</button>
+  </section>
+
+  <section>
+    <h2>Release Payment</h2>
+    <label>Deal ID:</label><br>
+    <input id="dealIdRelease" type="number" placeholder="1"><br><br>
+    <button id="releaseButton" class="release"> Release Payment</button>
+  </section>
+
+  <section>
+    <h2>Cancel Deal</h2>
+    <label>Deal ID:</label><br>
+    <input id="dealIdCancel" type="number" placeholder="1"><br><br>
+    <button id="cancelButton" class="cancel"> Cancel Deal</button>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.6.0/dist/ethers.umd.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

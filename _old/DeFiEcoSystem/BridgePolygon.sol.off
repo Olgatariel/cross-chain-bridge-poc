@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+interface IWrappedToken {
+    function mint(address to, uint256 amount) external;
+    function burn(uint256 amount) external;
+}
+
+contract BridgePolygon is Ownable, ReentrancyGuard {
+    
+    // Errors
+    error ZeroAmount();
+    error ZeroAddress();
+    error InvalidNonce();
+    error AlreadyProcessed();
+    
+    // Events
+    event TokensMinted(
+        address indexed user,
+        uint256 amount,
+        uint256 indexed sourceNonce
+    );
+    
+    event TokensBurned(
+        address indexed user,
+        uint256 amount,
+        uint256 indexed nonce,
+        bytes32 indexed messageHash
+    );
+    
+    // State variables
+    IWrappedToken public immutable wrappedToken;
+    IERC20 public immutable token; 
+    uint256 public nonce;
+    
+    // Tracking processed messages from Base
+    mapping(uint256 => bool) public processedMints;
+    
+    constructor(address wrappedTokenAddress) Ownable(msg.sender) {
+        if (wrappedTokenAddress == address(0)) revert ZeroAddress();
+        wrappedToken = IWrappedToken(wrappedTokenAddress);
+        token = IERC20(wrappedTokenAddress);
+    }
+    
+    /**
+     * @notice Mint wrapped tokens (called after verification from Avail)
+     * @param user User address
+     * @param amount Amount to mint
+     * @param sourceNonce Nonce from Base bridge
+     */
+    function mintTokens(
+        address user,
+        uint256 amount,
+        uint256 sourceNonce
+    ) external onlyOwner nonReentrant {
+        if (user == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (processedMints[sourceNonce]) revert AlreadyProcessed();
+        
+        processedMints[sourceNonce] = true;
+        wrappedToken.mint(user, amount);
+        
+        emit TokensMinted(user, amount, sourceNonce);
+    }
+    
+    /**
+     * @notice Burn wrapped tokens to bridge back to Base
+     * @param amount Amount of tokens to burn
+     */
+    function burnTokens(uint256 amount) external nonReentrant returns (uint256) {
+        if (amount == 0) revert ZeroAmount();
+        
+        // Transfer tokens from user to bridge
+        token.transferFrom(msg.sender, address(this), amount);
+        
+        // Bridge make burn
+        wrappedToken.burn(amount);
+        
+        uint256 currentNonce = nonce++;
+        
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                msg.sender,
+                amount,
+                currentNonce,
+                block.chainid
+            )
+        );
+        
+        emit TokensBurned(msg.sender, amount, currentNonce, messageHash);
+        
+        return currentNonce;
+    }
+}

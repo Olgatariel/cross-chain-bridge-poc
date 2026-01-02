@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/Timers.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+contract MiniLend is Ownable, ReentrancyGuard, Pausable {
+    using SafeERC20 for IERC20;
+    using Address for address;
+    using Timers for Timers.Timestamp;
+    using Counters for Counters.Counter;
+
+    IERC20 public token;
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+
+    Counters.Counter private loanIds;
+    uint256 public interestRate = 10; //10% річних
+
+    uint256 public minLoanDuration = 7 days;
+    uint256 public maxLoanDuration = 180 days;
+
+    uint256 public collateralRatio = 150; // 150%
+    uint256 public ethToTokenRate = 2000; // 1 ETH = 2000 TAR
+
+    //struct
+    struct Loan {
+        uint256 loanIds;
+        address borrower; //адреса позичальника
+        uint256 amount; //сумма боргу
+        uint256 collateral; //застава
+        Timers.Timestamp dueDate;
+        uint256 interestRate; // скільки зверху винен
+        bool repaid; //чи повернуто кредит
+        bool active;
+    }
+    struct Deposit {
+        address depositor; //хто зробив депозіт
+        uint256 amount; //сумма депозіту
+        uint256 startTime; //коли поклав
+        uint256 unlockTime; //може зняти через 30 днів без штрафу
+        bool active;
+    }
+    mapping(uint256 => Loan) public loans;
+    mapping(address => Deposit) public deposits;
+
+    event Deposited(
+        address indexed depositor,
+        uint256 amount,
+        uint256 startTime
+    );
+    event Withdrawn(address indexed depositor, uint256 amount);
+    event LoanCreated(
+        uint256 indexed loanId,
+        address borrower,
+        uint256 loanAmount,
+        uint256 collateral,
+        uint256 dueDate
+    );
+
+    error InvalidDeposit();
+    error InvalidAddress();
+    error DepositLocked();
+    error NotActiveDeposit();
+    error InvalidAmount();
+    error InvalidDuration();
+    error InsufficienteCollateral();
+    error NotEnoughLiquidity();
+
+    //functions deposit
+    function deposit(uint256 _depAmount) external nonReentrant whenNotPaused {
+        if (_depAmount == 0) revert InvalidDeposit();
+        if (msg.sender == address(0)) revert InvalidAddress();
+
+        token.safeTransferFrom(msg.sender, address(this), _depAmount);
+
+        deposits[msg.sender] = Deposit({
+            depositor: msg.sender,
+            amount: _depAmount,
+            startTime: block.timestamp,
+            unlockTime: block.timestamp + 30 days,
+            active: true
+        });
+
+        emit Deposited(msg.sender, _depAmount, block.timestamp);
+    }
+
+    function withdraw() external nonReentrant whenNotPaused {
+        if (msg.sender == address(0)) revert InvalidAddress();
+
+        Deposit storage userDeposit = deposits[msg.sender];
+        if (!userDeposit.active) revert NotActiveDeposit();
+
+        uint256 amount = userDeposit.amount;
+        uint256 reward = 0;
+
+        if (userDeposit.unlockTime > block.timestamp) {
+            uint256 penalty = (amount * 5) / 100;
+            amount = amount - penalty;
+        } else {
+            uint256 duration = block.timestamp - userDeposit.startTime;
+            reward =
+                (userDeposit.amount * interestRate * duration) /
+                (365 days * 100);
+            amount = (amount + reward);
+        }
+        userDeposit.active = false;
+
+        token.safeTransfer(msg.sender, amount);
+
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function getDepositInfo() external view returns (Deposit memory) {
+        return deposits[msg.sender];
+    }
+
+    function setInterestRate(uint256 _newRate) external onlyOwner {
+        interestRate = _newRate;
+    }
+
+    // function loan
+
+    function createLoan(uint256 _amount, uint256 _duration) external payable {
+        uint256 requiredCollateral = (_amount * collateralRatio) / 100;
+        uint256 requiredETH = requiredCollateral / ethToTokenRate;
+
+        if (_amount == 0) revert InvalidAmount();
+        if (_duration < minLoanDuration || _duration > maxLoanDuration)
+            revert InvalidDuration();
+
+        if (msg.value < requiredETH) revert InsufficienteCollateral();
+        if (token.balanceOf(address(this)) < _amount)
+            revert NotEnoughLiquidity();
+
+        loanIds.increment();
+        uint256 currentId = loanIds.current();
+
+        loans[currentId].loanIds = currentId;
+        loans[currentId].borrower = msg.sender;
+        loans[currentId].amount = _amount;
+        loans[currentId].collateral = msg.value; //ETH, який користувач надіслав
+        loans[currentId].dueDate.setDeadline(
+            uint64(block.timestamp + _duration)
+        );
+        loans[currentId].interestRate = interestRate;
+        loans[currentId].repaid = false;
+        loans[currentId].active = true;
+
+        token.safeTransfer(msg.sender, _amount);
+
+        emit LoanCreated(
+            currentId,
+            msg.sender,
+            _amount,
+            msg.value,
+            block.timestamp + _duration
+        );
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+}

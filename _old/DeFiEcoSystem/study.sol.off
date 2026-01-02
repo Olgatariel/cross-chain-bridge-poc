@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract StakingRewards {
+
+    // Errors
+    error InvalidAmount();
+    error InvalidChainId();
+    error TransferFailed();
+
+    // Events
+    event Deposit(address indexed user, uint256 amount, uint256 chainId);
+
+    // Token
+    IERC20 public immutable token;
+
+    // Deposit structure
+    struct DepositStruct {
+        uint256 amount;
+        uint256 chainId;
+    }
+
+    // Mapping user => array of deposits
+    mapping(address => DepositStruct[]) public deposits;
+
+    constructor(address tokenAddress) {
+        token = IERC20(tokenAddress);
+    }
+
+    function deposit(uint256 amount, uint256 chainId) external {
+        if(amount == 0) revert InvalidAmount();
+        if(chainId == 0) revert InvalidChainId();
+
+        bool success = token.transferFrom(msg.sender, address(this), amount);
+        if(!success) revert TransferFailed();
+
+        deposits[msg.sender].push(
+            DepositStruct({
+                amount: amount,
+                chainId: chainId
+            })
+        );
+
+        emit Deposit(msg.sender, amount, chainId);
+    }
+}
