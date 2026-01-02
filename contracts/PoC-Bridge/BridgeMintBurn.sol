@@ -98,30 +98,16 @@ contract BridgeMintBurn is AccessControl {
         emit WrappedMinted(to, amount, depositNonce);
     }
 
-    /// @notice Allows a user to request withdrawal back to the source chain
-    /// @dev Does not burn tokens, only emits an event for the relayer
-    /// @param amount Amount to withdraw
+    /// @notice Requests a withdrawal of wrapped tokens back to the source chain
+    /// @dev Tokens are burned immediately upon calling this function to prevent double-spending
+    /// @param amount The amount of wrapped tokens to burn and withdraw
     function requestWithdraw(uint256 amount) external {
         require(amount > 0, "Zero amount");
 
-        emit WithdrawRequested(msg.sender, amount, withdrawRequestNonce);
-        withdrawRequestNonce++;
-    }
+        // Burn the tokens from the caller immediately
+        wrappedToken.burn(msg.sender, amount);
 
-    /// @notice Burns wrapped tokens and finalizes a withdrawal
-    /// @dev Callable only by the bridge / relayer after off-chain verification
-    /// @param user Address whose tokens will be burned
-    /// @param amount Amount to burn
-    function burnWrapped(
-        address user,
-        uint256 amount
-    ) external onlyRole(BRIDGE_ROLE) {
-        require(user != address(0), "Zero address");
-        require(amount > 0, "Zero amount");
-
-        wrappedToken.burn(user, amount);
-
-        emit WithdrawIntent(user, amount, withdrawNonce);
+        emit WithdrawIntent(msg.sender, amount, withdrawNonce);
         withdrawNonce++;
     }
 }
