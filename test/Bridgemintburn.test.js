@@ -34,14 +34,13 @@ describe("BridgeMintBurn", function () {
             expect(await bridge.wrappedToken()).to.equal(wrappedToken.target);
         });
 
-        it("Should grant roles to admin", async function () {
+        it("Should grant admin role to admin", async function () {
             const DEFAULT_ADMIN_ROLE = ethers.ZeroHash;
             expect(await bridge.hasRole(DEFAULT_ADMIN_ROLE, owner.address)).to.be.true;
-            expect(await bridge.hasRole(BRIDGE_ROLE, owner.address)).to.be.true;
+            expect(await bridge.hasRole(BRIDGE_ROLE, owner.address)).to.be.false;
         });
 
-        it("Should initialize nonces to zero", async function () {
-            expect(await bridge.withdrawRequestNonce()).to.equal(0);
+        it("Should initialize withdrawNonce to zero", async function () {
             expect(await bridge.withdrawNonce()).to.equal(0);
         });
 
@@ -129,7 +128,7 @@ describe("BridgeMintBurn", function () {
         });
     });
 
-    describe("Request Withdraw", function () {
+    describe("Withdraw", function () {
         const mintAmount = ethers.parseEther("1000");
         const withdrawAmount = ethers.parseEther("500");
 
@@ -139,7 +138,7 @@ describe("BridgeMintBurn", function () {
         });
 
         it("Should burn tokens immediately", async function () {
-            await bridge.connect(user1).requestWithdraw(withdrawAmount);
+            await bridge.connect(user1).withdraw(withdrawAmount);
             
             expect(await wrappedToken.balanceOf(user1.address)).to.equal(
                 mintAmount - withdrawAmount
@@ -147,7 +146,7 @@ describe("BridgeMintBurn", function () {
         });
 
         it("Should emit WithdrawIntent event", async function () {
-            await expect(bridge.connect(user1).requestWithdraw(withdrawAmount))
+            await expect(bridge.connect(user1).withdraw(withdrawAmount))
                 .to.emit(bridge, "WithdrawIntent")
                 .withArgs(user1.address, withdrawAmount, 0); // First withdraw gets nonce 0
         });
@@ -155,14 +154,14 @@ describe("BridgeMintBurn", function () {
         it("Should increment withdrawNonce", async function () {
             expect(await bridge.withdrawNonce()).to.equal(0);
             
-            await bridge.connect(user1).requestWithdraw(withdrawAmount);
+            await bridge.connect(user1).withdraw(withdrawAmount);
             
             expect(await bridge.withdrawNonce()).to.equal(1);
         });
 
         it("Should revert if amount is zero", async function () {
             await expect(
-                bridge.connect(user1).requestWithdraw(0)
+                bridge.connect(user1).withdraw(0)
             ).to.be.revertedWith("Zero amount");
         });
 
@@ -170,13 +169,13 @@ describe("BridgeMintBurn", function () {
             const tooMuch = ethers.parseEther("2000");
             
             await expect(
-                bridge.connect(user1).requestWithdraw(tooMuch)
+                bridge.connect(user1).withdraw(tooMuch)
             ).to.be.reverted; // ERC20: burn amount exceeds balance
         });
 
         it("Should allow multiple withdrawals", async function () {
-            await bridge.connect(user1).requestWithdraw(withdrawAmount);
-            await bridge.connect(user1).requestWithdraw(withdrawAmount);
+            await bridge.connect(user1).withdraw(withdrawAmount);
+            await bridge.connect(user1).withdraw(withdrawAmount);
             
             expect(await wrappedToken.balanceOf(user1.address)).to.equal(0);
             expect(await bridge.withdrawNonce()).to.equal(2);
@@ -186,8 +185,8 @@ describe("BridgeMintBurn", function () {
             // Mint to user2
             await bridge.connect(relayer).mintWrapped(user2.address, mintAmount, 2);
             
-            await bridge.connect(user1).requestWithdraw(withdrawAmount);
-            await bridge.connect(user2).requestWithdraw(withdrawAmount);
+            await bridge.connect(user1).withdraw(withdrawAmount);
+            await bridge.connect(user2).withdraw(withdrawAmount);
             
             expect(await bridge.withdrawNonce()).to.equal(2);
         });
@@ -195,13 +194,13 @@ describe("BridgeMintBurn", function () {
         it("Should decrease total supply when tokens are burned", async function () {
             const initialSupply = await wrappedToken.totalSupply();
             
-            await bridge.connect(user1).requestWithdraw(withdrawAmount);
+            await bridge.connect(user1).withdraw(withdrawAmount);
             
             expect(await wrappedToken.totalSupply()).to.equal(initialSupply - withdrawAmount);
         });
 
         it("Should allow user to withdraw all tokens", async function () {
-            await bridge.connect(user1).requestWithdraw(mintAmount);
+            await bridge.connect(user1).withdraw(mintAmount);
             
             expect(await wrappedToken.balanceOf(user1.address)).to.equal(0);
         });
@@ -224,7 +223,7 @@ describe("BridgeMintBurn", function () {
             await bridge.connect(relayer).mintWrapped(user1.address, amount, 1);
             
             // User requests withdrawal (tokens are burned immediately)
-            await bridge.connect(user1).requestWithdraw(amount);
+            await bridge.connect(user1).withdraw(amount);
             
             expect(await wrappedToken.balanceOf(user1.address)).to.equal(0);
             expect(await bridge.withdrawNonce()).to.equal(1);
@@ -235,7 +234,7 @@ describe("BridgeMintBurn", function () {
             await bridge.connect(relayer).mintWrapped(user1.address, amount, 1);
             
             // Round trip 1: Polygon -> Base
-            await bridge.connect(user1).requestWithdraw(amount);
+            await bridge.connect(user1).withdraw(amount);
             
             // Round trip 2: Base -> Polygon
             await bridge.connect(relayer).mintWrapped(user1.address, amount, 2);
@@ -251,7 +250,7 @@ describe("BridgeMintBurn", function () {
             await bridge.connect(relayer).mintWrapped(user2.address, amount, 2);
             
             // User1 withdraws back to Base
-            await bridge.connect(user1).requestWithdraw(amount);
+            await bridge.connect(user1).withdraw(amount);
             
             // User2 still has tokens
             expect(await wrappedToken.balanceOf(user1.address)).to.equal(0);
@@ -287,11 +286,11 @@ describe("BridgeMintBurn", function () {
             
             // Now withdrawing full amount should fail
             await expect(
-                bridge.connect(user1).requestWithdraw(amount)
+                bridge.connect(user1).withdraw(amount)
             ).to.be.reverted; // ERC20: burn amount exceeds balance
             
             // But withdrawing remaining balance should work
-            await bridge.connect(user1).requestWithdraw(amount / 2n);
+            await bridge.connect(user1).withdraw(amount / 2n);
             expect(await wrappedToken.balanceOf(user1.address)).to.equal(0);
         });
 
@@ -321,7 +320,7 @@ describe("BridgeMintBurn", function () {
             const supplyBefore = await wrappedToken.totalSupply();
             
             // Withdraw should burn tokens immediately
-            await bridge.connect(user1).requestWithdraw(amount);
+            await bridge.connect(user1).withdraw(amount);
             
             expect(await wrappedToken.balanceOf(user1.address)).to.equal(balanceBefore - amount);
             expect(await wrappedToken.totalSupply()).to.equal(supplyBefore - amount);
@@ -336,7 +335,7 @@ describe("BridgeMintBurn", function () {
             await bridge.connect(relayer).mintWrapped(user1.address, amount, 1);
             
             // Request withdrawal (withdrawNonce starts at 0)
-            await bridge.connect(user1).requestWithdraw(amount);
+            await bridge.connect(user1).withdraw(amount);
             
             // Both nonce 1 should be usable in different contexts
             expect(await bridge.processedDeposits(1)).to.be.true;
@@ -351,13 +350,13 @@ describe("BridgeMintBurn", function () {
             
             expect(await bridge.withdrawNonce()).to.equal(0);
             
-            await bridge.connect(user1).requestWithdraw(amount);
+            await bridge.connect(user1).withdraw(amount);
             expect(await bridge.withdrawNonce()).to.equal(1);
             
-            await bridge.connect(user1).requestWithdraw(amount);
+            await bridge.connect(user1).withdraw(amount);
             expect(await bridge.withdrawNonce()).to.equal(2);
             
-            await bridge.connect(user1).requestWithdraw(amount);
+            await bridge.connect(user1).withdraw(amount);
             expect(await bridge.withdrawNonce()).to.equal(3);
         });
     });

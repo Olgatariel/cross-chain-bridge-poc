@@ -28,9 +28,6 @@ contract BridgeMintBurn is AccessControl {
     /// @notice Tracks processed deposit nonces from the source chain
     mapping(uint256 => bool) public processedDeposits;
 
-    /// @notice Sequential nonce for user withdrawal requests
-    uint256 public withdrawRequestNonce;
-
     /// @notice Sequential nonce for finalized withdrawals to the source chain
     uint256 public withdrawNonce;
 
@@ -42,17 +39,6 @@ contract BridgeMintBurn is AccessControl {
         address indexed to,
         uint256 amount,
         uint256 indexed depositNonce
-    );
-
-    /// @notice Emitted when a user requests a withdrawal
-    /// @dev Tokens are not burned at this stage
-    /// @param user Address requesting withdrawal
-    /// @param amount Requested amount
-    /// @param requestNonce Sequential withdrawal request nonce
-    event WithdrawRequested(
-        address indexed user,
-        uint256 amount,
-        uint256 indexed requestNonce
     );
 
     /// @notice Emitted when wrapped tokens are burned and withdrawal is finalized
@@ -75,7 +61,6 @@ contract BridgeMintBurn is AccessControl {
         wrappedToken = IWrappedToken(wrappedToken_);
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(BRIDGE_ROLE, admin);
     }
 
     /// @notice Mints wrapped tokens after verifying a deposit on the source chain
@@ -101,7 +86,7 @@ contract BridgeMintBurn is AccessControl {
     /// @notice Requests a withdrawal of wrapped tokens back to the source chain
     /// @dev Tokens are burned immediately upon calling this function to prevent double-spending
     /// @param amount The amount of wrapped tokens to burn and withdraw
-    function requestWithdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external {
         require(amount > 0, "Zero amount");
 
         // Burn the tokens from the caller immediately

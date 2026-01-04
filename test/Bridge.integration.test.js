@@ -119,7 +119,7 @@ describe("Bridge Integration Tests", function () {
 
         it("Should successfully bridge tokens from Polygon back to Base", async function () {
             // Step 1: User requests withdrawal on Polygon (tokens are burned immediately)
-            await bridgeMintBurn.connect(user1).requestWithdraw(bridgeAmount);
+            await bridgeMintBurn.connect(user1).withdraw(bridgeAmount);
             const withdrawNonce = (await bridgeMintBurn.withdrawNonce()) - 1n;
             
             // Verify wrapped tokens are burned
@@ -134,7 +134,7 @@ describe("Bridge Integration Tests", function () {
 
         it("Should emit correct events during withdrawal", async function () {
             // Check WithdrawIntent event (tokens are burned immediately)
-            await expect(bridgeMintBurn.connect(user1).requestWithdraw(bridgeAmount))
+            await expect(bridgeMintBurn.connect(user1).withdraw(bridgeAmount))
                 .to.emit(bridgeMintBurn, "WithdrawIntent")
                 .withArgs(user1.address, bridgeAmount, 0);
             
@@ -162,7 +162,7 @@ describe("Bridge Integration Tests", function () {
             expect(await wrappedToken1.balanceOf(user1.address)).to.equal(amount);
             
             // Polygon -> Base
-            await bridgeMintBurn.connect(user1).requestWithdraw(amount);
+            await bridgeMintBurn.connect(user1).withdraw(amount);
             await tokenConsumer.connect(relayer).release(user1.address, amount, 0);
             
             // User should have original tokens back
@@ -182,7 +182,7 @@ describe("Bridge Integration Tests", function () {
                 );
                 
                 // Polygon -> Base
-                await bridgeMintBurn.connect(user1).requestWithdraw(amount);
+                await bridgeMintBurn.connect(user1).withdraw(amount);
                 await tokenConsumer.connect(relayer).release(user1.address, amount, i);
             }
             
@@ -204,7 +204,7 @@ describe("Bridge Integration Tests", function () {
             await bridgeMintBurn.connect(relayer).mintWrapped(user1.address, totalAmount, 1);
             
             // Withdraw only partial amount back to Base
-            await bridgeMintBurn.connect(user1).requestWithdraw(partialAmount);
+            await bridgeMintBurn.connect(user1).withdraw(partialAmount);
             await tokenConsumer.connect(relayer).release(user1.address, partialAmount, 0);
             
             // User should have partial wrapped tokens and partial original tokens
@@ -223,11 +223,11 @@ describe("Bridge Integration Tests", function () {
             await bridgeMintBurn.connect(relayer).mintWrapped(user1.address, totalAmount, 1);
             
             // First partial withdrawal
-            await bridgeMintBurn.connect(user1).requestWithdraw(partialAmount);
+            await bridgeMintBurn.connect(user1).withdraw(partialAmount);
             await tokenConsumer.connect(relayer).release(user1.address, partialAmount, 0);
             
             // Second partial withdrawal
-            await bridgeMintBurn.connect(user1).requestWithdraw(partialAmount);
+            await bridgeMintBurn.connect(user1).withdraw(partialAmount);
             await tokenConsumer.connect(relayer).release(user1.address, partialAmount, 1);
             
             // Check remaining balance
@@ -262,7 +262,7 @@ describe("Bridge Integration Tests", function () {
             await wrappedToken1.connect(user1).transfer(user2.address, transferAmount);
             
             // User2 bridges back to Base
-            await bridgeMintBurn.connect(user2).requestWithdraw(transferAmount);
+            await bridgeMintBurn.connect(user2).withdraw(transferAmount);
             await tokenConsumer.connect(relayer).release(user2.address, transferAmount, 0);
             
             // User2 should receive original tokens on Base
@@ -312,7 +312,7 @@ describe("Bridge Integration Tests", function () {
             ).to.be.revertedWith("Deposit already processed");
             
             // Bridge back with nonce 0
-            await bridgeMintBurn.connect(user1).requestWithdraw(amount);
+            await bridgeMintBurn.connect(user1).withdraw(amount);
             await tokenConsumer.connect(relayer).release(user1.address, amount, 0);
             
             // Try to replay release with same nonce
@@ -329,7 +329,7 @@ describe("Bridge Integration Tests", function () {
             
             // User requests withdrawal - tokens are burned immediately
             const balanceBefore = await wrappedToken1.balanceOf(user1.address);
-            await bridgeMintBurn.connect(user1).requestWithdraw(amount);
+            await bridgeMintBurn.connect(user1).withdraw(amount);
             
             // Tokens should be gone immediately
             expect(await wrappedToken1.balanceOf(user1.address)).to.equal(0);

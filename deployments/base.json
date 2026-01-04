@@ -1,0 +1,9 @@
+{
+    "network": "baseSepolia",
+    "deployer": "0x9AB408371F230089612bC523A54EdadDb6aA1d05",
+    "relayer": "0x9AB408371F230089612bC523A54EdadDb6aA1d05",
+    "contracts": {
+      "Token1": "0x6e7406e945B6a41b0B9e15F5F139a521d4bbae41",
+      "TokenConsumer": "0x66A58371c29DcDca9991C2f27df6aAeF4EbAe0F0"
+    }
+  }

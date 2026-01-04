@@ -1,0 +1,9 @@
+{
+    "network": "polygonAmoy",
+    "deployer": "0x9AB408371F230089612bC523A54EdadDb6aA1d05",
+    "relayer": "0x9AB408371F230089612bC523A54EdadDb6aA1d05",
+    "contracts": {
+      "WrappedToken1": "0x9a801c2fF18234ce990c98d253Ebe6c49EB8eBEa",
+      "BridgeMintBurn": "0xFc454442344EcF8502ddC7Fb8Ea90eb1D3178e1C"
+    }
+  }
