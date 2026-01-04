@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (production only)
-RUN npm ci --only=production
+# Install dependencies 
+RUN npm install --omit=dev
 
 # Copy relayer files
 COPY relayer.js ./
