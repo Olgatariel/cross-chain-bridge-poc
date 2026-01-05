@@ -217,7 +217,7 @@ deployments/
 
 ## Testing
 
-We have comprehensive tests covering all aspects:
+The comprehensive tests covering all aspects:
 
 **Unit Tests:**
 
@@ -422,25 +422,6 @@ This is a Proof of Concept deployed on testnets:
 - No rate limiting
 - Owner can mint unlimited tokens (Token1)
 
-## Security
-
-**Audit Status:** Not audited (POC stage)
-
-**Security Features:**
-
-- ✅ Replay attack prevention (dual nonce system)
-- ✅ Double-spending prevention (atomic burns)
-- ✅ Role-based access control
-- ✅ Data availability proofs (Avail DA)
-- ✅ Comprehensive test coverage
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file
-
-## Disclaimer
-
-This project is a **proof of concept / educational project**
 It has NOT undergone:
 
 - Professional security audit
@@ -448,6 +429,22 @@ It has NOT undergone:
 - Comprehensive monitoring
 - Multi-signature governance
 - Emergency response procedures
+
+## Security
+
+**Audit Status:** Not audited (POC stage)
+
+**Security Features:**
+
+- Replay attack prevention (dual nonce system)
+- Double-spending prevention (atomic burns)
+- Role-based access control
+- Data availability proofs (Avail DA)
+- Comprehensive test coverage
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file
 
 ## Contact
 
