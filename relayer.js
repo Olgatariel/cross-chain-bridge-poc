@@ -13,8 +13,8 @@ const { submitToAvail } = require("./availHelper");
  */
 
 // RPC Providers
-const providerBase = new ethers.JsonRpcProvider(process.env.RPC_BASE);
-const providerPolygon = new ethers.JsonRpcProvider(process.env.RPC_POLYGON);
+const providerBase = new ethers.JsonRpcProvider('https://sepolia.base.org');
+const providerPolygon =  new ethers.JsonRpcProvider('https://rpc-amoy.polygon.technology');
 
 // Relayer wallets (same private key, different providers)
 const walletBase = new ethers.Wallet(process.env.RELAYER_PRIVATE_KEY, providerBase);
