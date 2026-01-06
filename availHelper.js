@@ -54,30 +54,64 @@ async function submitToAvail(user, amount, nonce, direction) {
     console.log(`   Direction: ${direction}`);
     console.log(`   Data:`, dataString);
     
-    const tx = sdk.tx.dataAvailability.submitData(dataString);
-    
-    const res = await tx.executeWaitForInclusion(account, { app_id: appId });
-    
-    if (!res.isSuccessful()) {
-        throw new Error("Avail transaction failed");
+    try {
+        const tx = sdk.tx.dataAvailability.submitData(dataString);
+        
+        // Додаємо опції для кращого nonce management та priority
+        const options = {
+            app_id: appId,
+            nonce: -1 // Auto-manage nonce
+        };
+        
+        const res = await tx.executeWaitForInclusion(account, options);
+        
+        if (!res.isSuccessful()) {
+            throw new Error("Avail transaction failed");
+        }
+        
+        const event = res.events.findFirst(Pallets.DataAvailabilityEvents.DataSubmitted);
+        if (!event) {
+            throw new Error("DataSubmitted event not found");
+        }
+        
+        console.log(" Data submitted to Avail!");
+        console.log(`   Block: ${res.blockNumber}`);
+        console.log(`   Tx Hash: ${res.txHash}`);
+        console.log(`   Data Hash: ${event.dataHash}`);
+        
+        return {
+            blockNumber: res.blockNumber,
+            blockHash: res.blockHash,
+            txHash: res.txHash,
+            dataHash: event.dataHash
+        };
+    } catch (error) {
+        console.error(" Avail submission error:", error.message);
+        
+        // Якщо помилка nonce - чекаємо і пробуємо ще раз
+        if (error.message.includes("Priority is too low") || error.message.includes("nonce")) {
+            console.log(" Waiting 5s and retrying...");
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Retry once
+            const tx = sdk.tx.dataAvailability.submitData(dataString);
+            const res = await tx.executeWaitForInclusion(account, { app_id: appId, nonce: -1 });
+            
+            if (res.isSuccessful()) {
+                const event = res.events.findFirst(Pallets.DataAvailabilityEvents.DataSubmitted);
+                console.log(" Retry successful!");
+                return {
+                    blockNumber: res.blockNumber,
+                    blockHash: res.blockHash,
+                    txHash: res.txHash,
+                    dataHash: event.dataHash
+                };
+            }
+        }
+        
+        throw error;
     }
-    
-    const event = res.events.findFirst(Pallets.DataAvailabilityEvents.DataSubmitted);
-    if (!event) {
-        throw new Error("DataSubmitted event not found");
-    }
-    
-    console.log(" Data submitted to Avail!");
-    console.log(`   Block: ${res.blockNumber}`);
-    console.log(`   Tx Hash: ${res.txHash}`);
-    console.log(`   Data Hash: ${event.dataHash}`);
-    
-    return {
-        blockNumber: res.blockNumber,
-        blockHash: res.blockHash,
-        txHash: res.txHash,
-        dataHash: event.dataHash
-    };
+
 }
 
 module.exports = { submitToAvail };
