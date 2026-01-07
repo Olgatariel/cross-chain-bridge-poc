@@ -298,6 +298,9 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
           
             setAmount(value);
           }}
+          placeholder="Enter amount"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          disabled={loading}
         />
       </div>
 
