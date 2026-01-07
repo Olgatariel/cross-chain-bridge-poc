@@ -284,10 +284,20 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
         <input
           type="number"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Enter amount"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={loading}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === '') {
+              setAmount('');
+              return;
+            }
+          
+            const numericValue = Number(value);
+            if (isNaN(numericValue) || numericValue <= 0) {
+              return;
+            }
+          
+            setAmount(value);
+          }}
         />
       </div>
 
