@@ -1,189 +1,126 @@
 # Base ↔ Polygon Bridge POC
 
-A bidirectional token bridge between Base and Polygon networks using wrapped token architecture with Avail Data Availability integration.
+A two-way token bridge between Base and Polygon networks using wrapped token architecture with Avail Data Availability integration.
 
-## Overview
+## What is this project?
 
-This project implements a production-ready two-way bridge that allows users to transfer ERC-20 tokens between Base and Polygon chains. When tokens move from Base to Polygon, they are locked on Base and wrapped tokens are minted on Polygon. Users can bridge back anytime with full data availability guarantees.
+This is a fully functional bridge that allowes transfer ERC-20 tokens between Base and Polygon networks. When tokens go from Base to Polygon - they get locked on Base and wrapped tokens are minted on Polygon. We can bridge them back anytime.
 
-**Current Status:** Phase 2 Complete - Full bridge operational on testnet  
-**Testnet Deployment:** Base Sepolia ↔ Polygon Amoy  
-**Next Phase:** Frontend development
+**Current Status:** Fully operational and deployed on testnet  
+**Live Demo:** https://cross-chain-bridge-poc-git-d4877e-olga-tariielashvilis-projects.vercel.app/
 
-## Live Demo
+## Live Deployment
 
-**Testnet Contracts:**
+**Contracts on Base Sepolia:**
 
-- **Base Sepolia:**
+- Token1: `0x6e7406e945B6a41b0B9e15F5F139a521d4bbae41`
+- TokenConsumer: `0x66A58371c29DcDca9991C2f27df6aAeF4EbAe0F0`
 
-  - Token1: `0x6e7406e945B6a41b0B9e15F5F139a521d4bbae41`
-  - TokenConsumer: `0x66A58371c29DcDca9991C2f27df6aAeF4EbAe0F0`
+**Contracts on Polygon Amoy:**
 
-- **Polygon Amoy:**
-  - WrappedToken1: `0x9a801c2fF18234ce990c98d253Ebe6c49EB8eBEa`
-  - BridgeMintBurn: `0xFc454442344EcF8502ddC7Fb8Ea90eb1D3178e1C`
+- WrappedToken1: `0x9a801c2fF18234ce990c98d253Ebe6c49EB8eBEa`
+- BridgeMintBurn: `0xFc454442344EcF8502ddC7Fb8Ea90eb1D3178e1C`
 
-**Relayer:** Running 24/7 on Railway  
-**Data Availability:** Avail Turing Testnet (AppID: 509)
+**Infrastructure:**
 
-## Why Wrapped Token Architecture?
+- Relayer: Railway (24/7)
+- Frontend: Vercel
+- Data Availability: Avail Turing (AppID: 509)
 
-I moved from a simple lock/unlock model to wrapped tokens because it was genuinely interesting for me to build this kind of product and understand how real cross-chain bridges work in practice.
+## Why wrapped tokens?
 
-- No need to pre-fund both chains
-- 1:1 backing guarantee (locked tokens = minted tokens)
-- Production-ready pattern (like WETH, USDC bridges)
-- Better scalability
-- Atomic operations prevent double-spending
+I started with a simple one-way bridge, but then decided to rebuild it with wrapped token architecture. The main goal was to build a complete, functional bridge that works in both directions.
 
-## Architecture
+## How it works
+
+### Architecture
 
 ```
-Base Chain (Source)              Avail DA              Polygon Chain (Destination)
-━━━━━━━━━━━━━━━━━━              ━━━━━━━━━━            ━━━━━━━━━━━━━━━━━━━━━━━━━
+Base Chain                    Avail DA              Polygon Chain
+━━━━━━━━━━━━                 ━━━━━━━━━━            ━━━━━━━━━━━━━
 
-Token1.sol                         │                   WrappedToken1.sol
-  ↓ lock                           │                     ↑ mint
-TokenConsumer.sol  ──relayer──→ Submit ──relayer──→ BridgeMintBurn.sol
-  ↑ unlock          ←─relayer──← Verify ←─relayer───   ↓ burn
+Token1.sol                      │                  WrappedToken1.sol
+  ↓ lock                        │                    ↑ mint
+TokenConsumer.sol ──relayer──→ Submit ──relayer──→ BridgeMintBurn.sol
+  ↑ unlock         ←─relayer──← Verify ←─relayer──   ↓ burn
 ```
 
-### How It Works
-
-**Base → Polygon (Deposit):**
+### Base → Polygon (Deposit)
 
 1. User approves and deposits tokens on Base
-2. Tokens are locked in TokenConsumer contract
-3. Relayer detects `DepositIntent` event
-4. Relayer submits transaction data to Avail DA
+2. Tokens get locked in TokenConsumer contract
+3. Relayer sees the `DepositIntent` event
+4. Relayer publishes data to Avail DA
 5. Relayer mints wrapped tokens on Polygon
-6. User receives wrapped tokens on Polygon
+6. User receives wTKN1 on Polygon
 
-**Polygon → Base (Withdrawal):**
+### Polygon → Base (Withdrawal)
 
 1. User requests withdrawal on Polygon
-2. Wrapped tokens are burned **immediately** (atomic - prevents double-spend!)
-3. Relayer detects `WithdrawIntent` event
-4. Relayer submits transaction data to Avail DA
+2. Wrapped tokens are **burned immediately** (atomic operation - prevents double-spending!)
+3. Relayer sees the `WithdrawIntent` event
+4. Relayer publishes data to Avail DA
 5. Relayer releases original tokens on Base
-6. User receives original tokens back on Base
+6. User receives their TKN1 back on Base
 
-**Data Availability:** All bridge transactions are published to Avail DA before execution, ensuring decentralized verification and fraud proofs.
+**Important detail:** All bridge transactions are published to Avail DA before execution. This provides decentralized verification and proof capabilities.
 
-## Smart Contracts
+## What I built
 
-### Base Chain
+### Smart Contracts
 
-**Token1.sol** - Original ERC-20 token
+**On Base:**
 
-- Has faucet for testing (100 tokens every 24 hours)
-- Owner can mint for special needs
-- Standard ERC-20 functionality
+- **Token1.sol** - original ERC-20 token with claim function (100 tokens every 24 hours - added for POC convenience)
+- **TokenConsumer.sol** - bridge contract for locking/unlocking tokens
 
-**TokenConsumer.sol** - Lock/unlock bridge contract
+**On Polygon:**
 
-- `deposit(amount)` - Lock tokens when bridging to Polygon
-- `release(to, amount, nonce)` - Unlock tokens when bridging back (relayer only)
-- Separate nonce tracking prevents replay attacks
-- Access control: only relayer can call `release()`
+- **WrappedToken1.sol** - wrapped ERC-20 token (minted on-demand)
+- **BridgeMintBurn.sol** - bridge controller for minting/burning
 
-### Polygon Chain
+### Off-Chain Infrastructure
 
-**WrappedToken1.sol** - Wrapped ERC-20 token
+**Relayer (relayer.js)**
 
-- Minted when Base tokens are locked
-- Only BRIDGE_ROLE can mint/burn
-- No initial supply (created on demand)
-- Standard ERC-20 with role-based access control
-
-**BridgeMintBurn.sol** - Bridge controller
-
-- `mintWrapped(to, amount, depositNonce)` - Mint wrapped tokens after Base deposit (relayer only)
-- `withdraw(amount)` - User initiates withdrawal, tokens burned immediately
-- Atomic burn prevents double-spending
-- Dual nonce system prevents replay attacks
-
-## Off-Chain Infrastructure
-
-### Relayer (relayer.js)
-
-**Status:** Running on Railway (24/7 uptime)
-
-**Capabilities:**
-
-- Monitors both Base and Polygon chains simultaneously
-- Detects events in real-time (3-second polling)
-- Processes transactions bidirectionally
+- Monitors both networks simultaneously
+- Processes events in real-time (3-second polling)
+- Works bidirectionally (both directions)
 - Automatic retry on failures
-- Comprehensive error handling
+- Running 24/7 on Railway
 
-**Architecture:**
+**Avail Helper (availHelper.js)**
 
-```javascript
-// Bidirectional event monitoring
-checkBaseDeposits()    → DepositIntent   → handleBaseToPolygon()
-checkPolygonWithdrawals() → WithdrawIntent → handlePolygonToBase()
-```
+- Integration with Avail Turing testnet
+- Publishes all bridge transactions
+- Provides data availability proofs
 
-### Avail Helper (availHelper.js)
+### Frontend
 
-**Status:** Integrated with Avail Turing Testnet
+**Tech Stack:**
+
+- React + Vite
+- Tailwind CSS
+- ethers.js v6.16
+- Deployed on Vercel
 
 **Features:**
 
-- Submits all bridge transactions to Avail DA
-- Provides data availability proofs
-- Enables fraud proofs and verification
-- AppID: 509 (dedicated bridge application)
+- MetaMask wallet connection
+- Manual network selection (user chooses which direction to bridge)
+- Balance display
+- Token claim function (my own token, once per 24 hours - for POC convenience)
+- Transaction history tracking
+- Live bridge operation status
 
-**Data Structure:**
+## Security Features (implemented)
 
-```json
-{
-  "user": "0x...",
-  "amount": "1000000000000000000",
-  "nonce": "1",
-  "direction": "base_to_polygon",
-  "timestamp": 1234567890,
-  "sourceChain": "Base",
-  "destinationChain": "Polygon"
-}
-```
-
-## Key Security Features
-
-**Dual Nonce System** - Separate nonces for each direction prevent conflicts:
-
-```
-Base:    currentNonce (outgoing) + processedNonces (incoming)
-Polygon: withdrawNonce (outgoing) + processedDeposits (incoming)
-```
-
-**Atomic Operations** - Tokens burned immediately on withdrawal request:
-
-```solidity
-// Burn happens BEFORE emitting event - prevents double-spending!
-wrappedToken.burn(msg.sender, amount);
-emit WithdrawIntent(msg.sender, amount, nonce++);
-```
-
-**Role-Based Access Control:**
-
-- Only relayer can execute `release()` on Base
-- Only BRIDGE_ROLE can execute `mintWrapped()` on Polygon
-- Only BRIDGE_ROLE can burn tokens from user addresses
-
-**Replay Attack Prevention:**
-
-- Each deposit nonce can only be processed once
-- Each withdrawal nonce can only be processed once
-- Nonces tracked separately per direction
-
-**Data Availability:**
-
-- All transactions published to Avail DA
-- Enables fraud proofs and verification
-- Decentralized data storage
+✅ **Dual Nonce System** - separate nonces for each direction  
+✅ **Atomic Burns** - tokens burned immediately on withdrawal  
+✅ **Role-Based Access Control** - only relayer can call critical functions  
+✅ **Replay Attack Prevention** - each nonce processed only once  
+✅ **Data Availability** - all transactions in Avail DA  
+✅ **Comprehensive Tests** - 106 tests, >95% code coverage
 
 ## Project Structure
 
@@ -195,52 +132,104 @@ contracts/
 └── BridgeMintBurn.sol      # Polygon: Mint/burn controller
 
 test/
-├── Token1.test.js               # Unit tests (15 tests)
-├── TokenConsumer.test.js        # Unit tests (18 tests)
-├── WrappedToken1.test.js        # Unit tests (20 tests)
-├── BridgeMintBurn.test.js       # Unit tests (22 tests)
-└── Bridge.integration.test.js   # Full flows (31 tests)
+├── Token1.test.js               # 15 unit tests
+├── TokenConsumer.test.js        # 18 unit tests
+├── WrappedToken1.test.js        # 20 unit tests
+├── BridgeMintBurn.test.js       # 22 unit tests
+└── Bridge.integration.test.js   # 31 integration tests
 
 scripts/
-├── deploy-base.js          # Base chain deployment
-├── deploy-polygon.js       # Polygon chain deployment
-└── setup-bridge.js         # Configure relayer permissions
+├── deploy-base.js          # Deploy to Base
+├── deploy-polygon.js       # Deploy to Polygon
+└── setup-bridge.js         # Setup permissions
 
-relayer.js                  # Bidirectional event processor
+relayer.js                  # Bidirectional relayer
 availHelper.js             # Avail DA integration
 
-deployments/
-├── base.json              # Base contract addresses
-├── polygon.json           # Polygon contract addresses
-└── bridge-config.json     # Complete bridge configuration
+frontend/
+├── src/
+│   ├── components/         # React components
+│   │   ├── BridgeForm.jsx
+│   │   ├── WalletConnect.jsx
+│   │   ├── NetworkSelector.jsx
+│   │   ├── TransactionStatus.jsx
+│   │   ├── RecentTransfers.jsx
+│   │   └── FaucetButton.jsx
+│   └── config/
+│       ├── chains.js       # Base/Polygon configs
+│       └── contracts.js    # Contract addresses & ABIs
+├── package.json
+└── vite.config.js
+```
+
+## How to run locally
+
+### Prerequisites
+
+```bash
+# Node.js 18+
+node --version
+
+# Testnet tokens
+# Base Sepolia ETH: https://faucet.quicknode.com/base/sepolia
+# Polygon MATIC: https://faucet.polygon.technology/
+# Avail AVL: https://faucet.avail.tools/
+```
+
+### Installation
+
+```bash
+# Clone repository
+git clone https://github.com/your-username/base-polygon-bridge.git
+cd base-polygon-bridge
+
+# Install dependencies
+npm install
+
+# Setup .env
+cp .env.example .env
+# Add your private keys
+```
+
+### Deploy Contracts
+
+```bash
+# 1. Deploy to Base Sepolia
+npx hardhat run scripts/deploy-base.js --network baseSepolia
+
+# 2. Deploy to Polygon Amoy
+npx hardhat run scripts/deploy-polygon.js --network polygonAmoy
+
+# 3. Setup permissions
+npx hardhat run scripts/setup-bridge.js --network baseSepolia
+```
+
+### Start Relayer
+
+```bash
+# Locally
+node relayer.js
+
+# Or on Railway (recommended)
+# 1. Push code to GitHub
+# 2. Connect repository in Railway
+# 3. Add environment variables
+# 4. Deploy
+```
+
+### Start Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Open http://localhost:3000
 ```
 
 ## Testing
 
-The comprehensive tests covering all aspects:
-
-**Unit Tests:**
-
-- All contract functions
-- Access control mechanisms
-- Edge cases and error conditions
-- Gas optimization verification
-
-**Integration Tests:**
-
-- Full bridge flows (Base → Polygon → Base)
-- Multiple users simultaneously
-- Partial withdrawals
-- User interactions on Polygon
-- Replay attack prevention
-- Double-spending prevention
-- Atomic burn operations
-- Supply invariant verification
-
-**Run tests:**
-
 ```bash
-# All tests
+# Run all tests
 npx hardhat test
 
 # With gas report
@@ -252,217 +241,98 @@ npx hardhat coverage
 
 **Test Results:**
 
-- Token1: 15/15 tests passing
-- TokenConsumer: 18/18 tests passing
-- WrappedToken1: 20/20 tests passing
-- BridgeMintBurn: 22/22 tests passing
-- Integration: 31/31 tests passing
-- **Total: 106/106 tests passing**
+- Token1: 15/15
+- TokenConsumer: 18/18
+- WrappedToken1: 20/20
+- BridgeMintBurn: 22/22
+- Integration: 31/31
+- **Total: 106/106 passing**
 
-**Coverage:** >95% line coverage across all contracts
+## How to use (Live Testnet)
 
-## Deployment
+### 1. Connect wallet
 
-### Prerequisites
+Open https://cross-chain-bridge-poc-git-d4877e-olga-tariielashvilis-projects.vercel.app/
 
-- Node.js >= 18.x
-- Testnet ETH on Base Sepolia
-- Testnet MATIC on Polygon Amoy
-- AVL tokens on Avail Turing
+Connect MetaMask to Base Sepolia or Polygon Amoy.
 
-### Installation
+### 2. Get test tokens
 
-```bash
-# Clone repository
-git clone <repository-url>
-cd base-polygon-bridge
+On Base Sepolia you can claim 100 TKN1 once every 24 hours (button in UI). This is my own token claim function added for POC convenience.
 
-# Install dependencies
-npm install
+### 3. Bridge Base → Polygon
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your keys
-```
+1. Select Base Sepolia direction
+2. Enter amount (for example 50)
+3. Click "Approve Tokens"
+4. Click "Bridge to Polygon"
+5. Wait ~10-30 seconds
+6. Switch to Polygon Amoy in your wallet
+7. Check wTKN1 balance
 
-### Deploy to Testnets
+### 4. Bridge Polygon → Base
 
-```bash
-# 1. Deploy Base contracts
-npx hardhat run scripts/deploy-base.js --network baseSepolia
+1. Select Polygon Amoy direction
+2. Enter amount
+3. Click "Bridge to Base"
+4. Wait ~10-30 seconds
+5. Switch to Base Sepolia in your wallet
+6. Check TKN1 balance
 
-# 2. Deploy Polygon contracts
-npx hardhat run scripts/deploy-polygon.js --network polygonAmoy
+## Performance
 
-# 3. Configure bridge (set relayer permissions)
-npx hardhat run scripts/setup-bridge.js --network baseSepolia
-```
+- **Bridge time:** ~10-30 seconds
+- **Gas (Base deposit):** ~65,000 gas
+- **Gas (Polygon withdraw):** ~85,000 gas
+- **Relayer polling:** every 3 seconds
 
-### Start Relayer
+## Tech Stack
 
-**Local:**
-
-```bash
-node relayer.js
-```
-
-**Production (Railway):**
-
-1. Connect GitHub repository to Railway
-2. Add environment variables in Railway dashboard
-3. Deploy automatically on push
-
-Required environment variables:
-
-```bash
-RELAYER_PRIVATE_KEY=...
-RPC_BASE=https://base-sepolia.g.alchemy.com/v2/...
-RPC_POLYGON=https://polygon-amoy.infura.io/v3/...
-TOKEN_CONSUMER_ADDRESS=...
-BRIDGE_MINT_BURN_ADDRESS=...
-AVAIL_RPC=wss://turing-rpc.avail.so/ws
-AVAIL_SEED=...
-AVAIL_APP_ID=509
-```
-
-## Roadmap
-
-### Phase 1: Smart Contracts (Complete)
-
-- Token1 with faucet
-- TokenConsumer lock/unlock
-- WrappedToken1 implementation
-- BridgeMintBurn controller
-- Dual nonce architecture
-- Comprehensive tests (106 tests total)
-- Gas optimization analysis
-- Security features (replay protection, atomic burns)
-
-### Phase 2: Off-chain Infrastructure (Complete)
-
-- **Relayer** - Automated bidirectional event processing
-- **Avail Helper** - Data availability layer integration
-- Event monitoring system (both chains)
-- Error handling and retries
-- Testnet deployment (Base Sepolia + Polygon Amoy)
-- 24/7 relayer on Railway
-- End-to-end testing on testnet
-
-### Phase 3: Production Ready (Next)
-
-- **Frontend interface** - User-friendly bridge UI
-- Multi-signature for admin operations
-- Monitoring dashboard
-- Security audit
-
-## Technical Details
-
-**Token Flow Example:**
-
-```
-Initial:  Base: User 1000 TKN | Bridge 0 TKN
-          Polygon: User 0 WTKN | Supply 0 WTKN
-
-Deposit:  Base: User 500 TKN | Bridge 500 TKN (locked)
-          Polygon: User 500 WTKN | Supply 500 WTKN (minted)
-
-Withdraw: Base: User 800 TKN | Bridge 200 TKN (locked)
-          Polygon: User 200 WTKN | Supply 200 WTKN (burned 300)
-
- Invariant: Locked tokens (200) = Wrapped supply (200)
-```
-
-**Nonce Architecture:**
-
-```
-Base → Polygon:
-1. deposit() on Base → DepositIntent(nonce=1)
-2. mintWrapped() on Polygon → processedDeposits[1]=true
-
-Polygon → Base:
-1. withdraw() on Polygon → WithdrawIntent(nonce=0)  ← Different nonce space!
-2. release() on Base → processedNonces[0]=true
-
-No conflicts: Each direction has separate nonce tracking
-```
-
-**Performance:**
-
-- Bridge transaction time: ~10-30 seconds
-- Gas cost (Base deposit): ~65,000 gas
-- Gas cost (Polygon withdraw): ~85,000 gas
-- Relayer processing: ~3 second polling interval
-
-## Live Testnet Usage
-
-**Get Test Tokens:**
-
-- Claim Token1 from faucet: Call `claimFaucet()` on Token1 contract
-
-**Bridge Tokens:**
-
-1. Approve TokenConsumer on Base
-2. Call `deposit(amount)` on TokenConsumer
-3. Wait ~20 seconds
-4. Check WrappedToken1 balance on Polygon
-5. Call `withdraw(amount)` on BridgeMintBurn to bridge back
-
-**Verify on Explorers:**
-
-- Base: https://sepolia.basescan.org/
-- Polygon: https://amoy.polygonscan.com/
-- Avail: https://explorer.avail.so/ (AppID: 509)
-
-## Known Limitations (POC Stage)
-
-This is a Proof of Concept deployed on testnets:
-
-- Centralized relayer (single point of failure)
-- No emergency pause mechanism
-- No rate limiting
-- Owner can mint unlimited tokens (Token1)
-
-It has NOT undergone:
-
-- Professional security audit
-- Additional safety mechanisms
-- Comprehensive monitoring
-- Multi-signature governance
-- Emergency response procedures
-
-## Security
-
-**Audit Status:** Not audited (POC stage)
-
-**Security Features:**
-
-- Replay attack prevention (dual nonce system)
-- Double-spending prevention (atomic burns)
-- Role-based access control
-- Data availability proofs (Avail DA)
-- Comprehensive test coverage
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file
-
-## Contact
-
-For questions or issues, please open a GitHub issue.
-
----
-
-**Built with:**
+**Smart Contracts:**
 
 - Solidity 0.8.20
 - OpenZeppelin Contracts v5.0
 - Hardhat v2.28
-- Ethers.js v6.16
-- Avail JS SDK v0.4.2
-- Deployed on Railway
+
+**Frontend:**
+
+- React 18
+- Vite
+- Tailwind CSS
+- ethers.js v6.16
+
+**Infrastructure:**
+
+- Relayer: Node.js on Railway
+- Frontend: Vercel
+- Data Availability: Avail JS SDK v0.4.2
 
 **Networks:**
 
-- Base Sepolia (Testnet)
-- Polygon Amoy (Testnet)
-- Avail Turing (Testnet)
+- Base Sepolia (testnet)
+- Polygon Amoy (testnet)
+- Avail Turing (testnet)
+
+## Resources
+
+**Explorers:**
+
+- Base Sepolia: https://sepolia.basescan.org/
+- Polygon Amoy: https://amoy.polygonscan.com/
+- Avail: https://explorer.avail.so/
+
+**Faucets:**
+
+- Base Sepolia: https://faucet.quicknode.com/base/sepolia
+- Polygon Amoy: https://faucet.polygon.technology/
+- Avail: https://faucet.avail.tools/
+
+**Documentation:**
+
+- Base: https://docs.base.org/
+- Polygon: https://wiki.polygon.technology/
+- Avail: https://docs.availproject.org/
+
+## License
+
+MIT License
