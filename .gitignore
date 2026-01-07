@@ -1,0 +1,44 @@
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Hardhat build artifacts
+/artifacts
+/cache
+/typechain
+/typechain-types
+/coverage
+/coverage.json
+
+# Frontend build files
+/frontend/dist/
+/frontend/build/
+
+# Editor settings
+.vscode/
+.idea/
+
+# Draft or archive contracts
+contracts/**/_drafts/
+contracts/**/*.off
+
+# System files
+.DS_Store
+
+# Old contracts
+/contracts/_archive
+/test/_archiveTests
+/UI
+/igniton
+/README.md.off
+/_old
+
+# Hardhat Ignition deployments
+ignition/deployments/chain-31337
+
+# Manual testing scripts
+scripts/manual-testing/
