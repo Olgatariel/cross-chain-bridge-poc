@@ -2,10 +2,15 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,jsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        'base-blue': '#0052FF',
+        'polygon-purple': '#8247E5',
+      }
+    },
   },
   plugins: [],
 }

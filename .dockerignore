@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Hardhat files (not needed for relayer)
+cache/
+artifacts/
+typechain/
+typechain-types/
+coverage/
+
+# Tests (not needed for relayer)
+test/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Deployment files (created locally)
+deployments/local-*.json
+
+# Documentation
+*.md
+!README.md
+
+# Scripts (not needed for relayer)
+scripts/local-testing/
+scripts/deploy-*.js
+scripts/setup-*.js
+scripts/set-relayer-*.js
+
+# Logs
+logs/
+*.log
+*.pid
