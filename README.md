@@ -36,13 +36,13 @@ I started with a simple one-way bridge, but then decided to rebuild it with wrap
 ### Architecture
 
 ```
-Base Chain                    Avail DA              Polygon Chain
-━━━━━━━━━━━━                 ━━━━━━━━━━            ━━━━━━━━━━━━━
+Base Chain                     Avail DA                 Polygon Chain
+━━━━━━━━━━━━                  ━━━━━━━━━━                ━━━━━━━━━━━━━
 
-Token1.sol                      │                  WrappedToken1.sol
-  ↓ lock                        │                    ↑ mint
-TokenConsumer.sol ──relayer──→ Submit ──relayer──→ BridgeMintBurn.sol
-  ↑ unlock         ←─relayer──← Verify ←─relayer──   ↓ burn
+Token1.sol                       │                      WrappedToken1.sol
+  ↓ lock                         │                          ↑ mint
+TokenConsumer.sol ─→ relayer ──→ Submit ── relayer  ─→  BridgeMintBurn.sol
+  ↑ unlock        ←─ relayer ←── Verify ←─ relayer  ←─      ↓ burn
 ```
 
 ### Base → Polygon (Deposit)
@@ -115,12 +115,12 @@ TokenConsumer.sol ──relayer──→ Submit ──relayer──→ BridgeMin
 
 ## Security Features (implemented)
 
-✅ **Dual Nonce System** - separate nonces for each direction  
-✅ **Atomic Burns** - tokens burned immediately on withdrawal  
-✅ **Role-Based Access Control** - only relayer can call critical functions  
-✅ **Replay Attack Prevention** - each nonce processed only once  
-✅ **Data Availability** - all transactions in Avail DA  
-✅ **Comprehensive Tests** - 106 tests, >95% code coverage
+ **Dual Nonce System** - separate nonces for each direction  
+ **Atomic Burns** - tokens burned immediately on withdrawal  
+ **Role-Based Access Control** - only relayer can call critical functions  
+ **Replay Attack Prevention** - each nonce processed only once  
+ **Data Availability** - all transactions in Avail DA  
+ **Comprehensive Tests** - 106 tests, >95% code coverage
 
 ## Project Structure
 
