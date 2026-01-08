@@ -106,7 +106,7 @@ async function checkBaseDeposits() {
             if (START_FROM_CURRENT) {
                 lastBlockBase = currentBlock;
                 console.log("Connected to Base. Current block:", currentBlock);
-                console.log("  START_FROM_CURRENT enabled - skipping historical events");
+                console.log("⚠️  START_FROM_CURRENT enabled - skipping historical events");
                 console.log("Starting from block:", lastBlockBase);
             } else {
                 lastBlockBase = currentBlock - 50;
@@ -147,24 +147,23 @@ async function checkBaseDeposits() {
  */
 async function handleBaseToPolygon(event) {
     const { user, amount, nonce } = event.args;
-    
-    // Skip if already processed in memory
     const nonceStr = nonce.toString();
-    if (processedDepositNonces.has(nonceStr)) {
-        console.log(`  Skipping deposit nonce ${nonceStr} - already processed`);
-        return;
-    }
     
-    // Check if already processed on blockchain
+    // ALWAYS check blockchain FIRST (most reliable)
     try {
         const isProcessed = await bridgeMintBurn.processedDeposits(nonce);
         if (isProcessed) {
-            console.log(`  Skipping deposit nonce ${nonceStr} - already processed on Polygon blockchain`);
-            processedDepositNonces.add(nonceStr); // Add to cache
+            console.log(`⏭️  Skipping deposit nonce ${nonceStr} - already processed on Polygon blockchain`);
+            processedDepositNonces.add(nonceStr); // Add to cache for this session
             return;
         }
     } catch (err) {
-        console.error(`  Could not check nonce ${nonceStr} status:`, err.message);
+        console.error(`⚠️  Could not check nonce ${nonceStr} status:`, err.message);
+        // If blockchain check fails, check memory cache as fallback
+        if (processedDepositNonces.has(nonceStr)) {
+            console.log(`⏭️  Skipping deposit nonce ${nonceStr} - in memory cache`);
+            return;
+        }
     }
     
     console.log("\n=======================================");
@@ -222,7 +221,7 @@ async function checkPolygonWithdrawals() {
             if (START_FROM_CURRENT) {
                 lastBlockPolygon = currentBlock;
                 console.log("Connected to Polygon. Current block:", currentBlock);
-                console.log("  START_FROM_CURRENT enabled - skipping historical events");
+                console.log("⚠️  START_FROM_CURRENT enabled - skipping historical events");
                 console.log("Starting from block:", lastBlockPolygon);
             } else {
                 lastBlockPolygon = currentBlock - 50;
@@ -263,24 +262,23 @@ async function checkPolygonWithdrawals() {
  */
 async function handlePolygonToBase(event) {
     const { user, amount, withdrawNonce } = event.args;
-    
-    // Skip if already processed in memory
     const nonceStr = withdrawNonce.toString();
-    if (processedWithdrawNonces.has(nonceStr)) {
-        console.log(`  Skipping withdrawal nonce ${nonceStr} - already processed`);
-        return;
-    }
     
-    // Check if already processed on blockchain
+    // ALWAYS check blockchain FIRST (most reliable)
     try {
         const isProcessed = await tokenConsumer.processedNonces(withdrawNonce);
         if (isProcessed) {
-            console.log(`  Skipping withdrawal nonce ${nonceStr} - already processed on Base blockchain`);
-            processedWithdrawNonces.add(nonceStr); // Add to cache
+            console.log(`⏭️  Skipping withdrawal nonce ${nonceStr} - already processed on Base blockchain`);
+            processedWithdrawNonces.add(nonceStr); // Add to cache for this session
             return;
         }
     } catch (err) {
-        console.error(`  Could not check nonce ${nonceStr} status:`, err.message);
+        console.error(`⚠️  Could not check nonce ${nonceStr} status:`, err.message);
+        // If blockchain check fails, check memory cache as fallback
+        if (processedWithdrawNonces.has(nonceStr)) {
+            console.log(`⏭️  Skipping withdrawal nonce ${nonceStr} - in memory cache`);
+            return;
+        }
     }
     
     console.log("\n=======================================");
