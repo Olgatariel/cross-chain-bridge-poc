@@ -31,14 +31,20 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
         const tokenConsumerConfig = getContract(chainId, 'TokenConsumer');
         
         if (token1Config && tokenConsumerConfig) {
+          // Create FRESH provider to avoid caching
+          const freshProvider = new ethers.BrowserProvider(window.ethereum);
+          
           const tokenContract = new ethers.Contract(
             token1Config.address,
             token1Config.abi,
-            provider
+            freshProvider
           );
           
+          // Get real user balance
           const bal = await tokenContract.balanceOf(account);
           const allow = await tokenContract.allowance(account, tokenConsumerConfig.address);
+          
+          console.log('📊 Base Balance loaded:', ethers.formatEther(bal), 'TKN1');
           
           setBalance(ethers.formatEther(bal));
           setAllowance(ethers.formatEther(allow));
@@ -53,19 +59,25 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
         const wrappedTokenConfig = getContract(chainId, 'WrappedToken1');
         
         if (wrappedTokenConfig) {
+          // Create FRESH provider
+          const freshProvider = new ethers.BrowserProvider(window.ethereum);
+          
           const tokenContract = new ethers.Contract(
             wrappedTokenConfig.address,
             wrappedTokenConfig.abi,
-            provider
+            freshProvider
           );
           
           const bal = await tokenContract.balanceOf(account);
+          
+          console.log('📊 Polygon Balance loaded:', ethers.formatEther(bal), 'wTKN1');
+          
           setBalance(ethers.formatEther(bal));
           setNeedsApproval(false);
         }
       }
     } catch (error) {
-      console.error('Error loading balance:', error);
+      console.error('❌ Error loading balance:', error);
     }
   };
 
@@ -79,14 +91,37 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
       const token1Config = getContract(chainId, 'Token1');
       const tokenConsumerConfig = getContract(chainId, 'TokenConsumer');
       
+      // Create FRESH provider and signer
+      const freshProvider = new ethers.BrowserProvider(window.ethereum);
+      const freshSigner = await freshProvider.getSigner();
+      
       const tokenContract = new ethers.Contract(
         token1Config.address,
         token1Config.abi,
-        signer
+        freshSigner
       );
       
       const amountWei = ethers.parseEther(amount);
-      const tx = await tokenContract.approve(tokenConsumerConfig.address, amountWei);
+      
+      // Estimate gas for approval
+      console.log('🔍 Estimating approval gas...');
+      let gasEstimate;
+      try {
+        gasEstimate = await tokenContract.approve.estimateGas(tokenConsumerConfig.address, amountWei);
+        console.log('⛽ Estimated gas:', gasEstimate.toString());
+      } catch (estimateError) {
+        console.error('❌ Gas estimation failed:', estimateError);
+        
+        if (estimateError.message.includes('insufficient funds')) {
+          throw new Error('Insufficient ETH for gas fees');
+        } else {
+          throw new Error('Approval will fail. Please try refreshing the page.');
+        }
+      }
+      
+      const tx = await tokenContract.approve(tokenConsumerConfig.address, amountWei, {
+        gasLimit: gasEstimate * 120n / 100n // +20% buffer
+      });
       
       setTxStatus({ 
         status: 'pending', 
@@ -95,7 +130,8 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
         chainId
       });
       
-      await tx.wait();
+      const receipt = await tx.wait();
+      console.log('✅ Approval confirmed:', receipt.transactionHash);
       
       setTxStatus({ 
         status: 'success', 
@@ -106,10 +142,29 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
       
       await loadBalanceAndAllowance();
     } catch (error) {
-      console.error('Approval error:', error);
+      console.error('❌ Approval error:', error);
+      
+      // HUMAN-READABLE ERROR MESSAGES
+      let errorMessage = 'Approval failed';
+      
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        errorMessage = '❌ You rejected the approval';
+      } else if (error.message.includes('Insufficient ETH')) {
+        errorMessage = error.message;
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = '❌ Insufficient ETH for gas fees';
+      } else if (error.code === -32603 || error.message.includes('Internal JSON-RPC')) {
+        errorMessage = '❌ Network connection error. Try:\n1. Refresh the page\n2. Reset Account in MetaMask (Settings → Advanced)';
+      } else if (error.reason) {
+        errorMessage = `❌ Contract error: ${error.reason}`;
+      } else if (error.message) {
+        const shortMessage = error.message.substring(0, 150);
+        errorMessage = `❌ ${shortMessage}${error.message.length > 150 ? '...' : ''}`;
+      }
+      
       setTxStatus({ 
         status: 'error', 
-        message: error.message || 'Approval failed' 
+        message: errorMessage
       });
     } finally {
       setLoading(false);
@@ -128,10 +183,29 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
         await handleWithdraw();
       }
     } catch (error) {
-      console.error('Bridge error:', error);
+      console.error('❌ Bridge error:', error);
+      
+      // HUMAN-READABLE ERROR MESSAGES
+      let errorMessage = 'Bridge transaction failed';
+      
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        errorMessage = '❌ You rejected the transaction';
+      } else if (error.message.includes('Insufficient')) {
+        errorMessage = error.message; // Already human-readable
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = '❌ Insufficient funds for gas fees';
+      } else if (error.code === -32603 || error.message.includes('Internal JSON-RPC')) {
+        errorMessage = '❌ Network connection error. Try refreshing the page or resetting your MetaMask account.';
+      } else if (error.reason) {
+        errorMessage = `❌ Contract error: ${error.reason}`;
+      } else if (error.message) {
+        const shortMessage = error.message.substring(0, 150);
+        errorMessage = `❌ ${shortMessage}${error.message.length > 150 ? '...' : ''}`;
+      }
+      
       setTxStatus({ 
         status: 'error', 
-        message: error.message || 'Bridge transaction failed' 
+        message: errorMessage
       });
     } finally {
       setLoading(false);
@@ -144,43 +218,127 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
       message: 'Initiating deposit on Base...' 
     });
     
-    const tokenConsumerConfig = getContract(chainId, 'TokenConsumer');
-    const consumerContract = new ethers.Contract(
-      tokenConsumerConfig.address,
-      tokenConsumerConfig.abi,
-      signer
-    );
-    
-    const amountWei = ethers.parseEther(amount);
-    const tx = await consumerContract.deposit(amountWei);
-    
-    setTxStatus({ 
-      status: 'pending', 
-      message: 'Locking tokens on Base...',
-      txHash: tx.hash,
-      chainId
-    });
-    
-    await tx.wait();
-    
-    setTxStatus({ 
-      status: 'processing', 
-      message: 'Tokens locked! Relayer will mint wrapped tokens on Polygon (~10-30s)...',
-      txHash: tx.hash,
-      chainId
-    });
-    
-    setAmount('');
-    await loadBalanceAndAllowance();
-    
-    setTimeout(() => {
-      setTxStatus({
-        status: 'success',
-        message: 'Bridge complete! Check your Polygon wallet for wTKN1 tokens.',
+    try {
+      const tokenConsumerConfig = getContract(chainId, 'TokenConsumer');
+      const token1Config = getContract(chainId, 'Token1');
+      
+      // Create FRESH provider and signer
+      const freshProvider = new ethers.BrowserProvider(window.ethereum);
+      const freshSigner = await freshProvider.getSigner();
+      
+      const consumerContract = new ethers.Contract(
+        tokenConsumerConfig.address,
+        tokenConsumerConfig.abi,
+        freshSigner
+      );
+      
+      const tokenContract = new ethers.Contract(
+        token1Config.address,
+        token1Config.abi,
+        freshProvider
+      );
+      
+      const amountWei = ethers.parseEther(amount);
+      
+      // Check balance
+      const currentBalance = await tokenContract.balanceOf(account);
+      if (currentBalance < amountWei) {
+        throw new Error(`Insufficient tokens. Your balance: ${ethers.formatEther(currentBalance)} TKN1`);
+      }
+      
+      // Check allowance
+      const currentAllowance = await tokenContract.allowance(account, tokenConsumerConfig.address);
+      if (currentAllowance < amountWei) {
+        throw new Error('Please click "Approve Tokens" first');
+      }
+      
+      // Estimate gas
+      console.log('🔍 Estimating gas...');
+      let gasEstimate;
+      try {
+        gasEstimate = await consumerContract.deposit.estimateGas(amountWei);
+        console.log('⛽ Estimated gas:', gasEstimate.toString());
+      } catch (estimateError) {
+        console.error('❌ Gas estimation failed:', estimateError);
+        
+        if (estimateError.message.includes('insufficient funds')) {
+          throw new Error('Insufficient ETH for gas fees');
+        } else if (estimateError.reason) {
+          throw new Error(`Contract error: ${estimateError.reason}`);
+        } else {
+          throw new Error('Transaction will fail. Please try refreshing the page.');
+        }
+      }
+      
+      const tx = await consumerContract.deposit(amountWei, {
+        gasLimit: gasEstimate * 120n / 100n // +20% buffer
+      });
+      
+      setTxStatus({ 
+        status: 'pending', 
+        message: 'Locking tokens on Base...',
         txHash: tx.hash,
         chainId
       });
-    }, 2000);
+      
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt.transactionHash);
+      
+      setTxStatus({ 
+        status: 'processing', 
+        message: 'Tokens locked! Relayer will mint wrapped tokens on Polygon (~10-30s)...',
+        txHash: tx.hash,
+        chainId
+      });
+      
+      setAmount('');
+      
+      // Update balance IMMEDIATELY
+      await loadBalanceAndAllowance();
+      
+      // Wait 15 seconds and show success
+      setTimeout(() => {
+        setTxStatus({
+          status: 'success',
+          message: '✅ Bridge complete! Check your Polygon wallet - wrapped tokens should appear.',
+          txHash: tx.hash,
+          chainId
+        });
+        
+        // Update again after 5 seconds
+        setTimeout(() => {
+          loadBalanceAndAllowance();
+        }, 5000);
+      }, 15000);
+      
+    } catch (error) {
+      console.error('❌ Deposit error:', error);
+      
+      // HUMAN-READABLE ERROR MESSAGES
+      let errorMessage = 'Transaction failed';
+      
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        errorMessage = '❌ You rejected the transaction';
+      } else if (error.message.includes('Insufficient tokens')) {
+        errorMessage = error.message;
+      } else if (error.message.includes('Approve Tokens')) {
+        errorMessage = error.message;
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = '❌ Insufficient ETH for gas fees';
+      } else if (error.code === -32603 || error.message.includes('Internal JSON-RPC')) {
+        errorMessage = '❌ Network connection error. Try:\n1. Refresh the page\n2. Reset Account in MetaMask (Settings → Advanced)';
+      } else if (error.reason) {
+        errorMessage = `❌ Contract error: ${error.reason}`;
+      } else if (error.message) {
+        const shortMessage = error.message.substring(0, 150);
+        errorMessage = `❌ ${shortMessage}${error.message.length > 150 ? '...' : ''}`;
+      }
+      
+      setTxStatus({ 
+        status: 'error', 
+        message: errorMessage
+      });
+    }
   };
 
   const handleWithdraw = async () => {
@@ -189,43 +347,124 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
       message: 'Initiating withdrawal on Polygon...' 
     });
     
-    const bridgeConfig = getContract(chainId, 'BridgeMintBurn');
-    const bridgeContract = new ethers.Contract(
-      bridgeConfig.address,
-      bridgeConfig.abi,
-      signer
-    );
-    
-    const amountWei = ethers.parseEther(amount);
-    const tx = await bridgeContract.withdraw(amountWei);
-    
-    setTxStatus({ 
-      status: 'pending', 
-      message: 'Burning wrapped tokens...',
-      txHash: tx.hash,
-      chainId
-    });
-    
-    await tx.wait();
-    
-    setTxStatus({ 
-      status: 'processing', 
-      message: 'Tokens burned! Relayer will release original tokens on Base (~10-30s)...',
-      txHash: tx.hash,
-      chainId
-    });
-    
-    setAmount('');
-    await loadBalanceAndAllowance();
-    
-    setTimeout(() => {
-      setTxStatus({
-        status: 'success',
-        message: 'Bridge complete! Check your Base wallet for TKN1 tokens.',
+    try {
+      const bridgeConfig = getContract(chainId, 'BridgeMintBurn');
+      
+      // Create FRESH provider and signer
+      const freshProvider = new ethers.BrowserProvider(window.ethereum);
+      const freshSigner = await freshProvider.getSigner();
+      
+      const bridgeContract = new ethers.Contract(
+        bridgeConfig.address,
+        bridgeConfig.abi,
+        freshSigner
+      );
+      
+      const amountWei = ethers.parseEther(amount);
+      
+      // Check balance before sending
+      const wrappedTokenConfig = getContract(chainId, 'WrappedToken1');
+      const tokenContract = new ethers.Contract(
+        wrappedTokenConfig.address,
+        wrappedTokenConfig.abi,
+        freshProvider
+      );
+      
+      const currentBalance = await tokenContract.balanceOf(account);
+      
+      if (currentBalance < amountWei) {
+        throw new Error(`Insufficient tokens. Your balance: ${ethers.formatEther(currentBalance)} wTKN1`);
+      }
+      
+      // Estimate gas
+      console.log('🔍 Estimating gas...');
+      let gasEstimate;
+      try {
+        gasEstimate = await bridgeContract.withdraw.estimateGas(amountWei);
+        console.log('⛽ Estimated gas:', gasEstimate.toString());
+      } catch (estimateError) {
+        console.error('❌ Gas estimation failed:', estimateError);
+        
+        // Check different error causes
+        if (estimateError.message.includes('insufficient funds')) {
+          throw new Error('Insufficient MATIC for gas fees. Get MATIC from faucet.');
+        } else if (estimateError.reason) {
+          throw new Error(`Contract error: ${estimateError.reason}`);
+        } else {
+          throw new Error('Transaction will fail. Please try refreshing the page.');
+        }
+      }
+      
+      const tx = await bridgeContract.withdraw(amountWei, {
+        gasLimit: gasEstimate * 120n / 100n // +20% buffer
+      });
+      
+      setTxStatus({ 
+        status: 'pending', 
+        message: 'Burning wrapped tokens...',
         txHash: tx.hash,
         chainId
       });
-    }, 2000);
+      
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt.transactionHash);
+      
+      setTxStatus({ 
+        status: 'processing', 
+        message: 'Tokens burned! Relayer will release original tokens on Base (~10-30s)...',
+        txHash: tx.hash,
+        chainId
+      });
+      
+      setAmount('');
+      
+      // Update balance IMMEDIATELY after burning
+      await loadBalanceAndAllowance();
+      
+      // Wait 15 seconds and show success
+      setTimeout(() => {
+        setTxStatus({
+          status: 'success',
+          message: '✅ Bridge complete! Check your Base wallet - tokens should appear.',
+          txHash: tx.hash,
+          chainId
+        });
+        
+        // Update again after 5 seconds
+        setTimeout(() => {
+          loadBalanceAndAllowance();
+        }, 5000);
+      }, 15000);
+      
+    } catch (error) {
+      console.error('❌ Withdrawal error:', error);
+      
+      // HUMAN-READABLE ERROR MESSAGES
+      let errorMessage = 'Transaction failed';
+      
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        errorMessage = '❌ You rejected the transaction';
+      } else if (error.message.includes('Insufficient tokens')) {
+        errorMessage = error.message; // Already human-readable
+      } else if (error.message.includes('Insufficient MATIC')) {
+        errorMessage = error.message; // Already human-readable
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = '❌ Insufficient MATIC for gas fees. Get MATIC from faucet: https://faucet.polygon.technology/';
+      } else if (error.code === -32603 || error.message.includes('Internal JSON-RPC')) {
+        errorMessage = '❌ Network connection error. Try:\n1. Refresh the page\n2. Reset Account in MetaMask (Settings → Advanced)\n3. Change RPC endpoint in MetaMask';
+      } else if (error.reason) {
+        errorMessage = `❌ Contract error: ${error.reason}`;
+      } else if (error.message) {
+        // Shorten technical messages
+        const shortMessage = error.message.substring(0, 150);
+        errorMessage = `❌ ${shortMessage}${error.message.length > 150 ? '...' : ''}`;
+      }
+      
+      setTxStatus({ 
+        status: 'error', 
+        message: errorMessage
+      });
+    }
   };
 
   const isValidAmount = amount && parseFloat(amount) > 0 && parseFloat(amount) <= parseFloat(balance);
@@ -272,9 +511,19 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
 
       <div className="mb-4 flex justify-between items-center">
         <span className="text-gray-600">Balance:</span>
-        <span className="font-semibold text-gray-800">
-          {parseFloat(balance).toFixed(4)} {isOnBase ? 'TKN1' : 'wTKN1'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-gray-800">
+            {parseFloat(balance).toFixed(4)} {isOnBase ? 'TKN1' : 'wTKN1'}
+          </span>
+          <button
+            onClick={loadBalanceAndAllowance}
+            className="text-blue-600 hover:text-blue-700 text-sm transition-colors"
+            title="Refresh balance"
+            disabled={loading}
+          >
+            🔄
+          </button>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -284,20 +533,7 @@ function BridgeForm({ account, chainId, signer, provider, onSwitchNetwork }) {
         <input
           type="number"
           value={amount}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (value === '') {
-              setAmount('');
-              return;
-            }
-          
-            const numericValue = Number(value);
-            if (isNaN(numericValue) || numericValue <= 0) {
-              return;
-            }
-          
-            setAmount(value);
-          }}
+          onChange={(e) => setAmount(e.target.value)}
           placeholder="Enter amount"
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           disabled={loading}
