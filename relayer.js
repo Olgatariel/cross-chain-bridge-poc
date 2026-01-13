@@ -1,55 +1,22 @@
 require("dotenv").config();
 const { ethers } = require("ethers");
 const { submitToAvail } = require("./availHelper");
-const fs = require('fs');
-const path = require('path');
 
 /**
- * Bidirectional Bridge Relayer with State Persistence
+ * Bidirectional Bridge Relayer
  * 
- * Improvements:
- * - Checks if deposits/withdrawals already processed before executing
- * - Saves last processed block to avoid re-scanning after restart
- * - Better error handling for duplicate transactions
+ * Monitors two chains for bridge events and processes cross-chain transfers:
+ * - Base -> Polygon: Listens for DepositIntent, mints wrapped tokens
+ * - Polygon -> Base: Listens for WithdrawIntent, releases original tokens
+ * 
+ * Data availability is ensured through Avail DA layer before executing transfers
  */
-
-// State file for persistence
-const STATE_FILE = path.join(__dirname, 'relayer-state.json');
-
-// Load saved state
-function loadState() {
-    try {
-        if (fs.existsSync(STATE_FILE)) {
-            const data = fs.readFileSync(STATE_FILE, 'utf8');
-            const state = JSON.parse(data);
-            console.log('📂 Loaded saved state:', state);
-            return state;
-        }
-    } catch (error) {
-        console.log('⚠️  Could not load state, starting fresh');
-    }
-    return { lastBlockBase: 0, lastBlockPolygon: 0 };
-}
-
-// Save state
-function saveState() {
-    try {
-        const state = {
-            lastBlockBase,
-            lastBlockPolygon,
-            timestamp: new Date().toISOString()
-        };
-        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-    } catch (error) {
-        console.error('❌ Could not save state:', error.message);
-    }
-}
 
 // RPC Providers
 const providerBase = new ethers.JsonRpcProvider(process.env.RPC_BASE);
 const providerPolygon = new ethers.JsonRpcProvider(process.env.RPC_POLYGON);
 
-// Relayer wallets
+// Relayer wallets (same private key, different providers)
 const walletBase = new ethers.Wallet(process.env.RELAYER_PRIVATE_KEY, providerBase);
 const walletPolygon = new ethers.Wallet(process.env.RELAYER_PRIVATE_KEY, providerPolygon);
 
@@ -66,11 +33,11 @@ const BridgeMintBurnABI = [
     "function processedDeposits(uint256) view returns (bool)"
 ];
 
-// Contract addresses
+// Contract addresses from environment
 const TOKEN_CONSUMER_ADDRESS = process.env.TOKEN_CONSUMER_ADDRESS;
 const BRIDGE_MINT_BURN_ADDRESS = process.env.BRIDGE_MINT_BURN_ADDRESS;
 
-// Contract instances for reading
+// Contract instances for reading events
 const tokenConsumer = new ethers.Contract(
     TOKEN_CONSUMER_ADDRESS, 
     TokenConsumerABI, 
@@ -83,7 +50,7 @@ const bridgeMintBurn = new ethers.Contract(
     providerPolygon
 );
 
-// Contract instances for writing
+// Contract instances for writing transactions
 const tokenConsumerWithSigner = new ethers.Contract(
     TOKEN_CONSUMER_ADDRESS,
     TokenConsumerABI,
@@ -96,18 +63,17 @@ const bridgeMintBurnWithSigner = new ethers.Contract(
     walletPolygon
 );
 
-// Block tracking - load from saved state
-const savedState = loadState();
+// Block tracking for event polling
 const MAX_BLOCK_RANGE = 10;
-let lastBlockBase = savedState.lastBlockBase || 0;
-let lastBlockPolygon = savedState.lastBlockPolygon || 0;
+let lastBlockBase = 0;
+let lastBlockPolygon = 0;
 
-// Polling intervals
+// Polling intervals (milliseconds)
 providerBase.pollingInterval = 3000;
 providerPolygon.pollingInterval = 3000;
 
 // Startup logs
-console.log("🌉 Bidirectional Bridge Relayer Started");
+console.log("Bidirectional Bridge Relayer Started");
 console.log("=====================================");
 console.log("Base Chain:");
 console.log("  TokenConsumer:", TOKEN_CONSUMER_ADDRESS);
@@ -121,16 +87,18 @@ console.log("=====================================\n");
 
 /**
  * Check Base chain for deposit events
+ * Scans new blocks and processes DepositIntent events
  */
 async function checkBaseDeposits() {
     try {
         const currentBlock = await providerBase.getBlockNumber();
         
+        // Initialize starting block on first run
         if (lastBlockBase === 0) {
             lastBlockBase = currentBlock - 50;
-            console.log("🔗 Connected to Base. Current block:", currentBlock);
-            console.log("📍 Starting from block:", lastBlockBase);
-            console.log("👂 Listening for Base DepositIntent events...\n");
+            console.log("Connected to Base. Current block:", currentBlock);
+            console.log("Starting from block:", lastBlockBase);
+            console.log("Listening for Base DepositIntent events...\n");
         }
         
         if (currentBlock > lastBlockBase) {
@@ -141,7 +109,7 @@ async function checkBaseDeposits() {
             const events = await tokenConsumer.queryFilter(filter, fromBlock, toBlock);
             
             if (events.length > 0) {
-                console.log(`\n[BASE] Found ${events.length} DepositIntent event(s)`);
+                console.log("\n[BASE] Found", events.length, "DepositIntent event(s)");
                 
                 for (const event of events) {
                     await handleBaseToPolygon(event);
@@ -152,19 +120,21 @@ async function checkBaseDeposits() {
         }
     } catch (error) {
         if (!error.message.includes("block range")) {
-            console.error("❌ Error checking Base events:", error.message);
+            console.error("Error checking Base events:", error.message);
         }
     }
 }
 
 /**
  * Process Base -> Polygon deposit
+ * 1. Submit data to Avail DA
+ * 2. Mint wrapped tokens on Polygon
  */
 async function handleBaseToPolygon(event) {
     const { user, amount, nonce } = event.args;
     
     console.log("\n=======================================");
-    console.log("📥 BASE -> POLYGON DEPOSIT DETECTED");
+    console.log("BASE -> POLYGON DEPOSIT DETECTED");
     console.log("=======================================");
     console.log("User:", user);
     console.log("Amount:", ethers.formatEther(amount), "tokens");
@@ -173,16 +143,19 @@ async function handleBaseToPolygon(event) {
     console.log("Transaction:", event.transactionHash);
     
     try {
-        // CHECK IF ALREADY PROCESSED
+        // CHECK IF ALREADY PROCESSED - Skip if true
+        console.log("\n🔍 Checking if deposit already processed...");
         const isProcessed = await bridgeMintBurnWithSigner.processedDeposits(nonce);
         
         if (isProcessed) {
-            console.log("\n⏭️  Deposit already processed, skipping...");
+            console.log("⏭️  SKIPPED: Deposit already processed (nonce:", nonce.toString(), ")");
             console.log("=======================================\n");
             return;
         }
         
-        // Step 1: Submit to Avail DA
+        console.log("✓ Deposit not processed yet, proceeding...");
+        
+        // Step 1: Submit to Avail DA for data availability proof
         console.log("\nStep 1: Publishing to Avail DA...");
         const availResult = await submitToAvail(user, amount, nonce, "base_to_polygon");
         console.log("✓ Avail confirmation received");
@@ -204,29 +177,32 @@ async function handleBaseToPolygon(event) {
         console.log("=======================================\n");
         
     } catch (err) {
-        console.error("\n❌ ERROR during Base->Polygon bridge:");
-        console.error("  Message:", err.message);
-        
-        if (err.message.includes("already processed")) {
-            console.log("  (This is expected for duplicate events)");
+        // Check if it's "Deposit already processed" error (expected behavior)
+        if (err.message.includes("Deposit already processed") || err.message.includes("AlreadyProcessed")) {
+            console.log("⏭️  SKIPPED: Deposit already processed (caught during execution)");
+            console.log("=======================================\n");
+        } else {
+            console.error("\n❌ ERROR during Base->Polygon bridge:");
+            console.error("  Message:", err.message);
+            console.error("=======================================\n");
         }
-        
-        console.error("=======================================\n");
     }
 }
 
 /**
  * Check Polygon chain for withdrawal events
+ * Scans new blocks and processes WithdrawIntent events
  */
 async function checkPolygonWithdrawals() {
     try {
         const currentBlock = await providerPolygon.getBlockNumber();
         
+        // Initialize starting block on first run
         if (lastBlockPolygon === 0) {
             lastBlockPolygon = currentBlock - 50;
-            console.log("🔗 Connected to Polygon. Current block:", currentBlock);
-            console.log("📍 Starting from block:", lastBlockPolygon);
-            console.log("👂 Listening for Polygon WithdrawIntent events...\n");
+            console.log("Connected to Polygon. Current block:", currentBlock);
+            console.log("Starting from block:", lastBlockPolygon);
+            console.log("Listening for Polygon WithdrawIntent events...\n");
         }
         
         if (currentBlock > lastBlockPolygon) {
@@ -237,7 +213,7 @@ async function checkPolygonWithdrawals() {
             const events = await bridgeMintBurn.queryFilter(filter, fromBlock, toBlock);
             
             if (events.length > 0) {
-                console.log(`\n[POLYGON] Found ${events.length} WithdrawIntent event(s)`);
+                console.log("\n[POLYGON] Found", events.length, "WithdrawIntent event(s)");
                 
                 for (const event of events) {
                     await handlePolygonToBase(event);
@@ -248,19 +224,21 @@ async function checkPolygonWithdrawals() {
         }
     } catch (error) {
         if (!error.message.includes("block range")) {
-            console.error("❌ Error checking Polygon events:", error.message);
+            console.error("Error checking Polygon events:", error.message);
         }
     }
 }
 
 /**
  * Process Polygon -> Base withdrawal
+ * 1. Submit data to Avail DA
+ * 2. Release original tokens on Base
  */
 async function handlePolygonToBase(event) {
     const { user, amount, withdrawNonce } = event.args;
     
     console.log("\n=======================================");
-    console.log("📤 POLYGON -> BASE WITHDRAWAL DETECTED");
+    console.log("POLYGON -> BASE WITHDRAWAL DETECTED");
     console.log("=======================================");
     console.log("User:", user);
     console.log("Amount:", ethers.formatEther(amount), "tokens");
@@ -269,16 +247,19 @@ async function handlePolygonToBase(event) {
     console.log("Transaction:", event.transactionHash);
     
     try {
-        // CHECK IF ALREADY PROCESSED
+        // CHECK IF ALREADY PROCESSED - Skip if true
+        console.log("\n🔍 Checking if withdrawal already processed...");
         const isProcessed = await tokenConsumerWithSigner.processedNonces(withdrawNonce);
         
         if (isProcessed) {
-            console.log("\n⏭️  Withdrawal already processed, skipping...");
+            console.log("⏭️  SKIPPED: Withdrawal already processed (nonce:", withdrawNonce.toString(), ")");
             console.log("=======================================\n");
             return;
         }
         
-        // Step 1: Submit to Avail DA
+        console.log("✓ Withdrawal not processed yet, proceeding...");
+        
+        // Step 1: Submit to Avail DA for data availability proof
         console.log("\nStep 1: Publishing to Avail DA...");
         const availResult = await submitToAvail(
             user, 
@@ -305,43 +286,36 @@ async function handlePolygonToBase(event) {
         console.log("=======================================\n");
         
     } catch (err) {
-        console.error("\n❌ ERROR during Polygon->Base bridge:");
-        console.error("  Message:", err.message);
-        
-        if (err.message.includes("AlreadyProcessed")) {
-            console.log("  (This is expected for duplicate events)");
+        // Check if it's "AlreadyProcessed" error (expected behavior)
+        if (err.message.includes("AlreadyProcessed") || err.data === "0x57eee766") {
+            console.log("⏭️  SKIPPED: Withdrawal already processed (caught during execution)");
+            console.log("=======================================\n");
+        } else {
+            console.error("\n❌ ERROR during Polygon->Base bridge:");
+            console.error("  Message:", err.message);
+            console.error("=======================================\n");
         }
-        
-        console.error("=======================================\n");
     }
 }
 
-// Save state periodically
-setInterval(saveState, 10000);
-
-// Save state on shutdown
-process.on('SIGINT', () => {
-    console.log('\n\n💾 Saving state before shutdown...');
-    saveState();
-    console.log('👋 Relayer shutting down...');
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    console.log('\n\n💾 Saving state before shutdown...');
-    saveState();
-    console.log('👋 Relayer shutting down...');
-    process.exit(0);
-});
-
 // Start event listeners
-console.log("🚀 Starting event listeners...\n");
+console.log("Starting event listeners...\n");
 
+// Poll both chains every 3 seconds
 setInterval(async () => {
     await checkBaseDeposits();
     await checkPolygonWithdrawals();
 }, 3000);
 
-// Run initial checks
+// Run initial checks immediately
 checkBaseDeposits();
 checkPolygonWithdrawals();
+
+// Graceful shutdown handler
+process.on('SIGINT', () => {
+    console.log('\n\nRelayer shutting down...');
+    process.exit(0);
+});
+
+
+
