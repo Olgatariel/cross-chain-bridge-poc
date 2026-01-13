@@ -42,3 +42,7 @@ ignition/deployments/chain-31337
 
 # Manual testing scripts
 scripts/manual-testing/
+
+relayer_2.js
+Recover_stuck_tokens.js
+stuck-withdrawals-recovered.json
